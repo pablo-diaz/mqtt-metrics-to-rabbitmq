@@ -1,0 +1,73 @@
+{
+    "queues": [
+        {
+            "name": "temperature/living_room",
+            "type": "classic",
+			"arguments":{},
+            "auto_delete": false,
+            "durable": true,
+            "vhost": "/"
+        }
+    ],
+    "bindings": [
+        {
+            "arguments": {},
+            "destination": "temperature/living_room",
+            "destination_type": "queue",
+            "routing_key": "temperature.living_room",
+            "source": "amq.topic",
+            "vhost": "/"
+        }
+    ],
+    "permissions": [
+        {
+            "configure": ".*",
+            "read": ".*",
+            "user": "mqtt-enabled-user",
+            "vhost": "/",
+            "write": ".*"
+        },
+        {
+            "configure": ".*",
+            "read": ".*",
+            "user": "guest",
+            "vhost": "/",
+            "write": ".*"
+        }
+    ],
+    "topic_permissions": [
+        {
+            "exchange": "amq.topic",
+            "read": ".*",
+            "user": "mqtt-enabled-user",
+            "vhost": "/",
+            "write": ".*"
+        }
+    ],
+    "users": [
+        {
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "mqtt-enabled-user",
+            "password_hash": "OWZsiJKsB2CcWJFzMYlbI12XKO7rthxtLtFoxeZzbtZUvrIh",
+            "tags": [ "administrator" ]
+        },
+        {
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "limits": {},
+            "name": "guest",
+            "password_hash": "gOqxL/swhSPT2FuXTvYKKJjQ5c8Sq6hMBVgWE8R5gwLPxyxc",
+            "tags": [ "administrator" ]
+        }
+    ],
+    "vhosts": [
+        {
+            "name": "/",
+            "limits": [],
+            "metadata": {
+                "description": "Default virtual host",
+                "tags": []
+            }
+        }
+    ]
+}

@@ -1,0 +1,5 @@
+https://github.com/dotnet/MQTTnet/blob/master/Samples/Client/Client_Publish_Samples.cs
+
+https://www.rabbitmq.com/docs/mqtt
+
+https://www.rabbitmq.com/docs/mqtt#config
