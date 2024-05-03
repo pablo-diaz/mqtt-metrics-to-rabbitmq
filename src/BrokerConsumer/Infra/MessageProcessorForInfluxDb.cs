@@ -4,11 +4,17 @@ using System.Threading.Tasks;
 using BrokerConsumer.Services;
 
 using CSharpFunctionalExtensions;
+using InfluxDB.Client;
+using InfluxDB.Client.Api.Domain;
 
 namespace BrokerConsumer.Infra;
 
 public class MessageProcessorForInfluxDb: IMessageProcessor
 {
+    private readonly InfluxDbConfig _influxConfig;
+    private readonly InfluxDBClient _influxClient;
+    private readonly WriteApiAsync _influxAsyncWritter;
+
     private class DeviceMetric
     {
         public string DeviceId { get; init; }
@@ -17,6 +23,20 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
 
         public override string ToString() =>
             $"[{TracedAt:yyyy-MM-dd} at {TracedAt:hh:mm:ss tt} - {DeviceId}]: Temp {Temperature}";
+
+        public DTOs.InfluxDeviceTemperatureMetric MapToInflux() =>
+            new DTOs.InfluxDeviceTemperatureMetric {
+                DeviceId = DeviceId,
+                Temperature = Temperature,
+                LoggedAt = TracedAt
+            };
+    }
+    
+    public MessageProcessorForInfluxDb(InfluxDbConfig influxConfig)
+    {
+        this._influxConfig = influxConfig;
+        this._influxClient = new InfluxDBClient(_influxConfig.ServiceUrl, _influxConfig.ServiceToken);
+        this._influxAsyncWritter = this._influxClient.GetWriteApiAsync();
     }
 
     public Task Process(string message)
@@ -29,7 +49,7 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
         }
 
         System.Console.WriteLine(parsedMessageResult.Value);
-        return Task.CompletedTask;
+        return StoreMetricInInflux(parsedMessageResult.Value);
     }
 
     private static Result<DeviceMetric> ParseMessage(string brokerMessage)
@@ -62,8 +82,14 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
         return new DateTime(int.Parse(dateParts[0]), int.Parse(dateParts[1]), int.Parse(dateParts[2]), int.Parse(timeParts[0]), int.Parse(timeParts[1]), int.Parse(timeParts[2]));
     }
 
+    private Task StoreMetricInInflux(DeviceMetric metric)
+    {
+        return _influxAsyncWritter.WriteMeasurementAsync(measurement: metric.MapToInflux(), precision: WritePrecision.Ns,
+            bucket: _influxConfig.Bucket, org: _influxConfig.Organization)!;
+    }
+
     public void Dispose()
     {
-        // TODO: complete here
+        _influxClient?.Dispose();
     }
 }

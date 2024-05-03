@@ -34,7 +34,8 @@ public class Program
                 services.AddSingleton<IMessageReceiver, RabbitMqMessageReceiver>(sp =>
                     new RabbitMqMessageReceiver(config: configuration.GetSection("RabbitMqConfig").Get<RabbitMqConfiguration>()));
 
-                services.AddSingleton<IMessageProcessor, MessageProcessorForInfluxDb>();
+                services.AddSingleton<IMessageProcessor, MessageProcessorForInfluxDb>(sp =>
+                    new MessageProcessorForInfluxDb(influxConfig: configuration.GetSection("InfluxDbSetup").Get<InfluxDbConfig>()));
 
                 services.AddHostedService<Jobs.BrokerMessageConsumer>();
             });
