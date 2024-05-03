@@ -1,0 +1,5 @@
+from(bucket: "device-metrics-db")
+  |> range(start: 2024-05-02T14:00:00Z, stop: 2024-05-04T18:00:00Z)
+  |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
+  |> filter(fn: (r) => r["device-id"] =~ /69291f12-974a-4d4d-a426-567ace6d6428/)
+  |> filter(fn: (r) => r._field == "temperature")

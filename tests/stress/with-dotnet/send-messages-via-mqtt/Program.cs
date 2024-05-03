@@ -25,30 +25,31 @@ public class Program
     public static async Task Main(string[] args)
     {
         await RunTestingScenarios(
-            new TestingScenario {
+            /*new TestingScenario {
                 Name = "Cold start",
                 ClientId = "PLM001",
                 DeviceCount = 1,
                 MetricCountPerDevice = 1,
-                StartingFromDate = new DateTime(2024, 5, 16, 15, 30, 45),
+                StartingFromDate = DateTime.Now,
                 MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
             },
 
             new TestingScenario {
                 Name = "1 device sending 20 metrics",
-                ClientId = "PLM001",
+                ClientId = "PLM002",
                 DeviceCount = 1,
                 MetricCountPerDevice = 20,
-                StartingFromDate = new DateTime(2024, 5, 17, 15, 30, 45),
+                StartingFromDate = DateTime.Now,
                 MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
             },
+            */
 
             new TestingScenario {
-                Name = "10 devices sending 30 metrics each",
-                ClientId = "PLM002",
-                DeviceCount = 10,
-                MetricCountPerDevice = 30,
-                StartingFromDate = new DateTime(2024, 5, 18, 15, 30, 45),
+                Name = "1 device sending 200 metrics",
+                ClientId = "PLM003",
+                DeviceCount = 1,
+                MetricCountPerDevice = 200,
+                StartingFromDate = DateTime.Now,
                 MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
             }
         );
@@ -68,9 +69,10 @@ public class Program
         return mqttClient;
     }
 
-    private static async Task SendMetrics(int forDeviceId, IMqttClient withMqttClient, string targetBrokerTopic, int withMetricCountPerDevice, Random usingRandomizer, DateTime fromDate, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
+    private static async Task SendMetrics(int forDeviceId, Guid sessionId, IMqttClient withMqttClient, string targetBrokerTopic, int withMetricCountPerDevice,
+        Random usingRandomizer, DateTime fromDate, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
     {
-        foreach(var message in GetTemperatureMetrics(forDeviceId: forDeviceId, usingRandomizer, fromDate)
+        foreach(var message in GetTemperatureMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate)
                                .Take(withMetricCountPerDevice))
         {
             var applicationMessage = new MqttApplicationMessageBuilder()
@@ -100,8 +102,10 @@ public class Program
                 using var client = await ConnectToMqttBroker(withClientId: scenario.ClientId);
                 Console.WriteLine("Connected to MQTT broker successfully");
 
+                var sessionId = Guid.NewGuid();
+
                 await Task.WhenAll(Enumerable.Range(start: 1, count: scenario.DeviceCount)
-                                   .Select(deviceId => SendMetrics(forDeviceId: deviceId, withMqttClient: client, targetBrokerTopic: mqttBrokerTopic,
+                                   .Select(deviceId => SendMetrics(forDeviceId: deviceId, sessionId: sessionId, withMqttClient: client, targetBrokerTopic: mqttBrokerTopic,
                                            withMetricCountPerDevice: scenario.MetricCountPerDevice, usingRandomizer: randomizer, fromDate: scenario.StartingFromDate,
                                            getMillisecondsToWaitWhileSendingEachMessage: scenario.MillisecondsToWaitWhileSendingEachMessageFn)));
 
@@ -113,9 +117,11 @@ public class Program
                 Console.WriteLine($"General exception caught. Reason: {ex.Message}");
             }
         }
+
+        Console.WriteLine("\n ************* Finished runnig all scenarios *********************");
     }
 
-    private static IEnumerable<string> GetTemperatureMetrics(int forDeviceId, Random usingRandomizer, DateTime fromDate)
+    private static IEnumerable<string> GetTemperatureMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
     {
         var aDate = fromDate;
 
@@ -124,7 +130,7 @@ public class Program
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
             var temperature = Math.Round(value: usingRandomizer.NextDouble() * 100.0, digits: 2);
 
-            yield return $"{deviceId}@{temperature}@{aDate:yyyy-M-d@H_m_s}";
+            yield return $"{sessionId}_{deviceId}@{temperature}@{aDate:yyyy-M-d@H_m_s}";
 
             aDate = aDate.AddSeconds(1);
         }

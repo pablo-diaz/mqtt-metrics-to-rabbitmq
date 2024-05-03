@@ -42,7 +42,16 @@ public sealed class RabbitMqMessageReceiver : IMessageReceiver
     {
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.Received += async (_, queueMessage) => {
-            await messageHandlerAsyncFn(System.Text.Encoding.UTF8.GetString(queueMessage.Body.ToArray()));
+            try
+            {
+                await messageHandlerAsyncFn(System.Text.Encoding.UTF8.GetString(queueMessage.Body.ToArray()));
+            }
+            catch (System.Exception ex)
+            {
+                System.Console.WriteLine($"General exception caught while processing broker message. Reason: {ex.Message}");
+                throw;
+            }
+
             _channel.BasicAck(deliveryTag: queueMessage.DeliveryTag, multiple: false);
         };
         _channel.BasicConsume(queue: _config.TemperatureMetricsConfig.Queue, autoAck: false, consumer: consumer);
