@@ -45,10 +45,10 @@ public class Program
             */
 
             new TestingScenario {
-                Name = "1 device sending 200 metrics",
+                Name = "3 devices sending 100 metrics each",
                 ClientId = "PLM003",
-                DeviceCount = 1,
-                MetricCountPerDevice = 200,
+                DeviceCount = 3,
+                MetricCountPerDevice = 100,
                 StartingFromDate = DateTime.Now,
                 MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
             }
@@ -124,15 +124,32 @@ public class Program
     private static IEnumerable<string> GetTemperatureMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
     {
         var aDate = fromDate;
+        var temperature = Math.Round(value: usingRandomizer.NextDouble() * 100.0, digits: 2);
 
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
-            var temperature = Math.Round(value: usingRandomizer.NextDouble() * 100.0, digits: 2);
+            temperature = Math.Round(value: RandomlyGetNextTemperature(basedOnCurrentTemperature: temperature, randomizer: usingRandomizer), digits: 2);
 
             yield return $"{sessionId}_{deviceId}@{temperature}@{aDate:yyyy-M-d@H_m_s}";
 
             aDate = aDate.AddSeconds(1);
         }
+    }
+
+    private static double RandomlyGetNextTemperature(double basedOnCurrentTemperature, Random randomizer)
+    {
+        var randomNumber = randomizer.Next(minValue: 1, maxValue: 200);
+        var shouldIncreaseTemperature = randomNumber > 190;
+        var shouldDecreaseTemperature = randomNumber < 10;
+        var delta = randomizer.NextDouble() * 5.0;
+
+        if(shouldIncreaseTemperature)
+            return basedOnCurrentTemperature + delta;
+        
+        if(shouldDecreaseTemperature)
+            return basedOnCurrentTemperature - delta;
+
+        return basedOnCurrentTemperature;
     }
 }
