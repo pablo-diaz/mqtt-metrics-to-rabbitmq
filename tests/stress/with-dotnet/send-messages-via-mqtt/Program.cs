@@ -12,9 +12,46 @@ namespace SendMessagesViaMqtt;
 
 public class Program
 {
+    private class TestingScenario
+    {
+        public string Name { get; set; }
+        public string ClientId { get; set; }
+        public int DeviceCount { get; set; }
+        public int MetricCountPerDevice { get; set; }
+        public DateTime StartingFromDate { get; set; }
+        public Func<int> MillisecondsToWaitWhileSendingEachMessageFn { get; set; }
+    }
+
     public static async Task Main(string[] args)
     {
-        await RunTestingScenarios();
+        await RunTestingScenarios(
+            new TestingScenario {
+                Name = "Cold start",
+                ClientId = "PLM001",
+                DeviceCount = 1,
+                MetricCountPerDevice = 1,
+                StartingFromDate = new DateTime(2024, 5, 16, 15, 30, 45),
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            },
+
+            new TestingScenario {
+                Name = "1 device sending 20 metrics",
+                ClientId = "PLM001",
+                DeviceCount = 1,
+                MetricCountPerDevice = 20,
+                StartingFromDate = new DateTime(2024, 5, 17, 15, 30, 45),
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            },
+
+            new TestingScenario {
+                Name = "10 devices sending 30 metrics each",
+                ClientId = "PLM002",
+                DeviceCount = 10,
+                MetricCountPerDevice = 30,
+                StartingFromDate = new DateTime(2024, 5, 18, 15, 30, 45),
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            }
+        );
     }
 
     private static async Task<IMqttClient> ConnectToMqttBroker(string withClientId)
@@ -49,39 +86,32 @@ public class Program
         }
     }
 
-    private static Task RunScenario(string scenarioName, IMqttClient withMqttClient, string targetBrokerTopic, int forDeviceCount, int withMetricCountPerDevice, Random usingRandomizer, DateTime fromDate, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
+    private static async Task RunTestingScenarios(params TestingScenario[] scenarios)
     {
-        Console.WriteLine($"Running scenario '{scenarioName}'");
-        var tasks = Enumerable.Range(start: 1, count: forDeviceCount)
-                    .Select(deviceId => SendMetrics(forDeviceId: deviceId, withMqttClient: withMqttClient, targetBrokerTopic: targetBrokerTopic, withMetricCountPerDevice: withMetricCountPerDevice,
-                        usingRandomizer: usingRandomizer, fromDate: fromDate, getMillisecondsToWaitWhileSendingEachMessage: getMillisecondsToWaitWhileSendingEachMessage));
+        var randomizer = new Random(Seed: 125785);
+        var mqttBrokerTopic = "temperature/living_room";
 
-        return Task.WhenAll(tasks);
-    }
-
-    private static async Task RunTestingScenarios()
-    {
-        try
+        foreach(var scenario in scenarios)
         {
-            using var client = await ConnectToMqttBroker(withClientId: "PLC001");
-            Console.WriteLine("Connected to MQTT broker successfully");
+            try
+            {
+                Console.WriteLine($"\n------ Running scenario '{scenario.Name}' ---------");
 
-            var randomizer = new Random(Seed: 125785);
+                using var client = await ConnectToMqttBroker(withClientId: scenario.ClientId);
+                Console.WriteLine("Connected to MQTT broker successfully");
 
-            await RunScenario(scenarioName: "Sending fifty temperatures from one device, every second", withMqttClient: client, targetBrokerTopic: "temperature/living_room",
-                forDeviceCount: 1, withMetricCountPerDevice: 50, usingRandomizer: randomizer, fromDate: new DateTime(2024, 5, 17, 20, 55, 40),
-                getMillisecondsToWaitWhileSendingEachMessage: () => 1_000);
+                await Task.WhenAll(Enumerable.Range(start: 1, count: scenario.DeviceCount)
+                                   .Select(deviceId => SendMetrics(forDeviceId: deviceId, withMqttClient: client, targetBrokerTopic: mqttBrokerTopic,
+                                           withMetricCountPerDevice: scenario.MetricCountPerDevice, usingRandomizer: randomizer, fromDate: scenario.StartingFromDate,
+                                           getMillisecondsToWaitWhileSendingEachMessage: scenario.MillisecondsToWaitWhileSendingEachMessageFn)));
 
-            await RunScenario(scenarioName: "Sending twenty temperatures from ten devices, every second", withMqttClient: client, targetBrokerTopic: "temperature/living_room",
-                forDeviceCount: 10, withMetricCountPerDevice: 20, usingRandomizer: randomizer, fromDate: new DateTime(2024, 5, 17, 23, 59, 55),
-                getMillisecondsToWaitWhileSendingEachMessage: () => 1_000);
-
-            await client.DisconnectAsync();
-            Console.WriteLine("Finished: MQTT client session has been disconnected from broker");
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine($"General exception caught. Reason: {ex.Message}");
+                await client.DisconnectAsync();
+                Console.WriteLine("Finished runnig scenario. MQTT client session has been disconnected from broker");
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"General exception caught. Reason: {ex.Message}");
+            }
         }
     }
 
