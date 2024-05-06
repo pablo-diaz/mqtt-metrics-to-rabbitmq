@@ -21,6 +21,16 @@ docker run -d --name myinfluxdb -v $(pwd)/volumes/myInfluxVolume:/var/lib/influx
 
 # docker pull grafana/grafana:10.4.2
 
+docker run -d --name=grafana -p 3000:3000 -v $(pwd)/volumes/sample-input-files:/home/grafana/input-files -v $(pwd)/volumes/grafana-storage:/var/lib/grafana -v $(pwd)/config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro -e "GF_INSTALL_PLUGINS=marcusolsson-csv-datasource 0.6.16" grafana/grafana:10.4.2
 docker run -d --name=grafana -p 3000:3000 grafana/grafana:10.4.2
 
-host.docker.internal
+grafana-cli plugins install marcusolsson-csv-datasource
+https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#override-configuration-with-environment-variables
+
+
+/etc/grafana/grafana.ini
+
+[plugin.marcusolsson-csv-datasource]
+allow_local_mode = true
+
+http://host.docker.internal:8086

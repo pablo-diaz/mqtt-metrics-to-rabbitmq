@@ -46,7 +46,7 @@ public class Program
 
             new TestingScenario {
                 Name = "3 devices sending 100 metrics each",
-                ClientId = "PLM003",
+                ClientId = "PLC003",
                 DeviceCount = 3,
                 MetricCountPerDevice = 100,
                 StartingFromDate = DateTime.Now,
