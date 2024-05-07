@@ -1,7 +1,8 @@
 ﻿using System.Threading.Tasks;
 
-using BrokerConsumer.Services;
 using BrokerConsumer.Infra;
+using BrokerConsumer.Services;
+using BrokerConsumer.Infra.DTOs;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -34,8 +35,9 @@ public class Program
                 services.AddSingleton<IMessageReceiver, RabbitMqMessageReceiver>(sp =>
                     new RabbitMqMessageReceiver(config: configuration.GetSection("RabbitMqConfig").Get<RabbitMqConfiguration>()));
 
-                services.AddSingleton<IMessageProcessor, MessageProcessorForInfluxDb>(sp =>
-                    new MessageProcessorForInfluxDb(influxConfig: configuration.GetSection("InfluxDbSetup").Get<InfluxDbConfig>()));
+                services.AddSingleton<IMessageProcessor, MessageProcessorForInfluxDb>(sp => new MessageProcessorForInfluxDb(
+                    influxConfig: configuration.GetSection("InfluxDbSetup").Get<InfluxDbConfig>(),
+                    processorConfig: configuration.GetSection("ProcessorConfig").Get<ProcessorConfig>() ));
 
                 services.AddHostedService<Jobs.BrokerMessageConsumer>();
             });

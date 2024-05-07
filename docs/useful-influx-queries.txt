@@ -8,12 +8,26 @@ from(bucket: "device-metrics-db")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
   |> filter(fn: (r) => r["_field"] == "temperature")
-  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
   |> yield(name: "mean")
 
 from(bucket: "device-metrics-db")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r._measurement == "device-temperature-metric")
   |> filter(fn: (r) => r["_field"] == "temperature")
-  |> keep(columns: ["_value", "device-id", "_time"])
-  |> yield(name: "temperatura_en_dispositivo")
+  |> keep(columns: ["device-id", "_value", "_time"])
+  |> rename(
+        fn: (column) => {
+            newColumnName = if column == "device-id" then "device_id" else column
+            return newColumnName
+        },
+    )
+  |> group()
+
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
+  |> unique(column: "device-id")
+  |> keep(columns: ["device-id"])
+  |> group()
+  |> map(fn: (r) => ({ foo: r["device-id"] }))

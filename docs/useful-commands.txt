@@ -14,6 +14,7 @@ rabbitmqctl export_definitions /path/to/definitions.file.json
 
 # https://hub.docker.com/_/influxdb
 
+docker run -d --name myinfluxdb -p 8086:8086 -v $(pwd)/volumes/influx-data:/var/lib/influxdb2 -e DOCKER_INFLUXDB_INIT_MODE=setup -e DOCKER_INFLUXDB_INIT_USERNAME=guest -e DOCKER_INFLUXDB_INIT_PASSWORD=prueba2024 -e DOCKER_INFLUXDB_INIT_ORG=personal -e DOCKER_INFLUXDB_INIT_BUCKET=device-metrics-db -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN="EIKFDKIF1R4zs0KrvYpJPVoYiFJ4pJfvSuEjkvOf_kgDHOTuBml5R2TJXem3zEjQkJLZZ5BPYTO-clj2-e6pgQ==" -e DOCKER_INFLUXDB_INIT_RETENTION=1w influxdb:2.7.4
 docker run -d --name myinfluxdb -p 8086:8086 -e DOCKER_INFLUXDB_INIT_MODE=setup -e DOCKER_INFLUXDB_INIT_USERNAME=guest -e DOCKER_INFLUXDB_INIT_PASSWORD=prueba2024 -e DOCKER_INFLUXDB_INIT_ORG=personal -e DOCKER_INFLUXDB_INIT_BUCKET=device-metrics-db -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN="EIKFDKIF1R4zs0KrvYpJPVoYiFJ4pJfvSuEjkvOf_kgDHOTuBml5R2TJXem3zEjQkJLZZ5BPYTO-clj2-e6pgQ==" -e DOCKER_INFLUXDB_INIT_RETENTION=1w influxdb:2.7.4
 docker run -d --name myinfluxdb -v $(pwd)/volumes/myInfluxVolume:/var/lib/influxdb2 -p 8086:8086 influxdb:2.7.4
 
@@ -21,7 +22,7 @@ docker run -d --name myinfluxdb -v $(pwd)/volumes/myInfluxVolume:/var/lib/influx
 
 # docker pull grafana/grafana:10.4.2
 
-docker run -d --name=grafana -p 3000:3000 -v $(pwd)/volumes/sample-input-files:/home/grafana/input-files -v $(pwd)/volumes/grafana-storage:/var/lib/grafana -v $(pwd)/config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro -e "GF_INSTALL_PLUGINS=marcusolsson-csv-datasource 0.6.16" grafana/grafana:10.4.2
+docker run -d --name=grafana -p 3000:3000 -v $(pwd)/volumes/sample-input-files:/home/grafana/input-files -v $(pwd)/volumes/grafana-storage:/var/lib/grafana -v $(pwd)/config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro -e "GF_INSTALL_PLUGINS=marcusolsson-csv-datasource 0.6.17" grafana/grafana:10.4.2
 docker run -d --name=grafana -p 3000:3000 grafana/grafana:10.4.2
 
 grafana-cli plugins install marcusolsson-csv-datasource
