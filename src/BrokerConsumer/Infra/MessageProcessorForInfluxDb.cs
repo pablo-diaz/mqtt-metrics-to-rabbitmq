@@ -135,6 +135,8 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
                 continue;
             }
 
+            if(line.Trim().Length == 0) continue;
+
             (var deviceId, var deviceValues) = ParseCsvLine(line);
             _deviceAditionalInformation[deviceId] = deviceValues;
         }

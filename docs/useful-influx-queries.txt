@@ -27,7 +27,31 @@ from(bucket: "device-metrics-db")
 from(bucket: "device-metrics-db")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
-  |> unique(column: "device-id")
-  |> keep(columns: ["device-id"])
+  |> keep(columns: ["departmento"])
+  |> unique(column: "departmento")
   |> group()
-  |> map(fn: (r) => ({ foo: r["device-id"] }))
+  |> map(fn: (r) => ({ foo: r["departmento"] }))
+
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
+  |> filter(fn: (r) => r["_field"] == "temperature")
+  |> filter(fn: (r) => r["ciudad"] =~ /${cities:regex}/)
+  |> group(columns: ["ciudad"], mode: "by")
+  |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+  |> last()
+  |> yield(name: "mean")
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+isFieldInArray = (field, array) =>
+    if length(arr: array) == 0 then true
+    else contains(value: field, set: array)
+
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
+  |> filter(fn: (r) => r["_field"] == "temperature")
+  |> filter(fn: (r) => isFieldInArray(field: r["ciudad"], array: ["Manizales", "Neira"]))
+  |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+  |> yield(name: "mean")
