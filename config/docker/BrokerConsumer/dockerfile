@@ -1,0 +1,9 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 as build-env
+WORKDIR /src
+COPY src/ .
+RUN dotnet publish -c Release -o /publish /src/BrokerConsumer/BrokerConsumer.csproj
+
+FROM mcr.microsoft.com/dotnet/runtime:8.0 as runtime
+WORKDIR /publish
+COPY --from=build-env /publish .
+ENTRYPOINT ["dotnet", "BrokerConsumer.dll"]
