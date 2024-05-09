@@ -43,7 +43,7 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
             var point = InfluxDB.Client.Writes.PointData.Measurement("device-temperature-metric");
             point = point.Tag("device-id", DeviceId);
             point = point.Field("temperature", Temperature);
-            point = point.Timestamp(timestamp: TracedAt.ToUniversalTime(), timeUnit: WritePrecision.Ns);
+            point = point.Timestamp(timestamp: ToUtc(TracedAt), timeUnit: WritePrecision.Ns);
 
             foreach(var aditionalInfo in withDeviceAditionalInfo)
                 point = point.Tag(name: aditionalInfo.AditionalFieldName,
@@ -51,6 +51,9 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
 
             return point;
         }
+
+        private static DateTime ToUtc(DateTime from) =>
+            from.AddHours(5);  // TODO: convert this date, considering regional settings
     }
     
     public MessageProcessorForInfluxDb(InfluxDbConfig influxConfig, ProcessorConfig processorConfig)
