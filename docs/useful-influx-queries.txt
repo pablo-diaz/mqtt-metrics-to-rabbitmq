@@ -55,3 +55,39 @@ from(bucket: "device-metrics-db")
   |> filter(fn: (r) => isFieldInArray(field: r["ciudad"], array: ["Manizales", "Neira"]))
   |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
   |> yield(name: "mean")
+
+---------------------------------------------------------------------------------------------------
+
+import "csv"
+import "join"
+
+deviceMetrics = from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
+  |> filter(fn: (r) => r["_field"] == "temperature")
+  |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+  |> keep(columns: ["device-id", "departmento", "ciudad", "_value", "_time"])
+  |> rename(
+        fn: (column) => {
+            newColumnName = if column == "device-id" then "deviceId" else column
+            return newColumnName
+        },
+    )
+  //|> yield(name: "coso1")
+
+csvData =
+    "
+deviceId,responsable,area,empresa
+154ecf95-cf5d-4b79-99f6-f0d1ab38de07_Dev0000000001,Carlos,Area01,Empresa01
+154ecf95-cf5d-4b79-99f6-f0d1ab38de07_Dev0000000002,Juan,Area50,Empresa02
+154ecf95-cf5d-4b79-99f6-f0d1ab38de07_Dev0000000003,Pedro,Area01,Empresa01
+"
+
+join.inner(
+    left: deviceMetrics |> group(columns: ["deviceId"]),
+    right: csv.from(csv: csvData, mode: "raw") |> group(columns: ["deviceId"]), // |> yield(name: "coso2"),
+    on: (l, r) => l["deviceId"] == r["deviceId"],
+    as: (l, r) => ({l with responsable: r.responsable, area: r.area, empresa: r.empresa})
+)
+|> group()
+|> yield(name: "coso3")
