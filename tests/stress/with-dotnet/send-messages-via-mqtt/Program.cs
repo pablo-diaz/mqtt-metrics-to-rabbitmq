@@ -131,7 +131,7 @@ public class Program
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
             temperature = Math.Round(value: RandomlyGetNextTemperature(basedOnCurrentTemperature: temperature, randomizer: usingRandomizer), digits: 2);
 
-            yield return $"{sessionId}_{deviceId}@{temperature}@{aDate:yyyy-M-d@H_m_s}";
+            yield return $"{deviceId}@{temperature}@{aDate:yyyy-M-d@H_m_s}";
 
             aDate = aDate.AddSeconds(1);
         }

@@ -118,12 +118,11 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
 
     private IEnumerable<(string AditionalFieldName, string WithValue)> GetDeviceAditionalInfo(DeviceMetric basedOnMetric)
     {
-        var deviceIdToSearch = basedOnMetric.DeviceId.Split(separator: '_')[1];
-        if(_deviceAditionalInformation.ContainsKey(deviceIdToSearch) == false)
+        if(_deviceAditionalInformation.ContainsKey(basedOnMetric.DeviceId) == false)
             yield break;
 
         for(var i = 0; i < _deviceAditionalInfoFields.Count; i++)
-            yield return (AditionalFieldName: _deviceAditionalInfoFields[i], WithValue: _deviceAditionalInformation[deviceIdToSearch][i]);
+            yield return (AditionalFieldName: _deviceAditionalInfoFields[i], WithValue: _deviceAditionalInformation[basedOnMetric.DeviceId][i]);
     }
 
     private Result LoadDeviceInformation(string fromFile)

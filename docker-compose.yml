@@ -39,7 +39,7 @@ services:
     volumes:
       - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./volumes/grafana-storage:/var/lib/grafana
-      - ./volumes/sample-input-files:/home/grafana/input-files
+      #- ./volumes/sample-input-files:/home/grafana/input-files
     ports:
       - "80:3000"
     depends_on:
@@ -53,7 +53,7 @@ services:
     image: "broker-consumer:jaime-c8.0-001"
     volumes:
       - ./config/docker/BrokerConsumer/settings.json:/publish/appsettings.json:ro
-      - ./volumes/sample-input-files/device-info.csv://var/device-metrics-processor/device-info.csv:ro
+      - ./docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro
     depends_on:
       brokerserver:
         condition: service_healthy
