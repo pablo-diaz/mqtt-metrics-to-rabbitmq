@@ -14,6 +14,9 @@ public class Program
 {
     private class TestingScenario
     {
+        public enum ScenarioType { Availability, Quality, Temperature }
+
+        public ScenarioType Type { get; set; }
         public string Name { get; set; }
         public string ClientId { get; set; }
         public int DeviceCount { get; set; }
@@ -25,33 +28,35 @@ public class Program
     public static async Task Main(string[] args)
     {
         await RunTestingScenarios(
-            /*new TestingScenario {
-                Name = "Cold start",
-                ClientId = "PLM001",
-                DeviceCount = 1,
-                MetricCountPerDevice = 1,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            },
-
             new TestingScenario {
-                Name = "1 device sending 20 metrics",
-                ClientId = "PLM002",
-                DeviceCount = 1,
-                MetricCountPerDevice = 20,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            },
-            */
-
-            new TestingScenario {
-                Name = "3 devices sending 100 metrics each",
-                ClientId = "PLC003",
+                Type = TestingScenario.ScenarioType.Temperature,
+                Name = "3 devices sending 100 temperature metrics each",
+                ClientId = "PLC001",
                 DeviceCount = 3,
                 MetricCountPerDevice = 100,
                 StartingFromDate = DateTime.Now,
                 MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
             }
+            
+            /*new TestingScenario {
+                Type = TestingScenario.ScenarioType.Availability,
+                Name = "3 devices sending 100 availability metrics each",
+                ClientId = "PLC002",
+                DeviceCount = 3,
+                MetricCountPerDevice = 100,
+                StartingFromDate = DateTime.Now,
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            }*/
+
+            /*new TestingScenario {
+                Type = TestingScenario.ScenarioType.Quality,
+                Name = "3 devices sending 100 quality metrics each",
+                ClientId = "PLC003",
+                DeviceCount = 3,
+                MetricCountPerDevice = 100,
+                StartingFromDate = DateTime.Now,
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            }*/
         );
     }
 
@@ -69,11 +74,24 @@ public class Program
         return mqttClient;
     }
 
-    private static async Task SendMetrics(int forDeviceId, Guid sessionId, IMqttClient withMqttClient, string targetBrokerTopic, int withMetricCountPerDevice,
-        Random usingRandomizer, DateTime fromDate, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
+    private static async Task SendMetrics(int forDeviceId, Guid sessionId, IMqttClient withMqttClient, int withMetricCountPerDevice,
+        Random usingRandomizer, DateTime fromDate, TestingScenario.ScenarioType scenarioType, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
     {
-        foreach(var message in GetTemperatureMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate)
-                               .Take(withMetricCountPerDevice))
+        var messagesToSend = scenarioType switch {
+            TestingScenario.ScenarioType.Temperature => GetTemperatureMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
+            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
+            TestingScenario.ScenarioType.Quality => GetQualityMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
+            _ => throw new Exception("Non expected scenario type")
+        };
+
+        var targetBrokerTopic = scenarioType switch {
+            TestingScenario.ScenarioType.Temperature => "temperature/living_room",
+            TestingScenario.ScenarioType.Quality => "Calidad",
+            TestingScenario.ScenarioType.Availability => "Disponibilidad",
+            _ => throw new Exception("Non expected scenario type 2")
+        };
+
+        foreach(var message in messagesToSend)
         {
             var applicationMessage = new MqttApplicationMessageBuilder()
                 .WithTopic(targetBrokerTopic)
@@ -91,8 +109,6 @@ public class Program
     private static async Task RunTestingScenarios(params TestingScenario[] scenarios)
     {
         var randomizer = new Random(Seed: 125785);
-        var mqttBrokerTopic = "temperature/living_room";
-
         foreach(var scenario in scenarios)
         {
             try
@@ -105,7 +121,7 @@ public class Program
                 var sessionId = Guid.NewGuid();
 
                 await Task.WhenAll(Enumerable.Range(start: 1, count: scenario.DeviceCount)
-                                   .Select(deviceId => SendMetrics(forDeviceId: deviceId, sessionId: sessionId, withMqttClient: client, targetBrokerTopic: mqttBrokerTopic,
+                                   .Select(deviceId => SendMetrics(forDeviceId: deviceId, sessionId: sessionId, withMqttClient: client, scenarioType: scenario.Type,
                                            withMetricCountPerDevice: scenario.MetricCountPerDevice, usingRandomizer: randomizer, fromDate: scenario.StartingFromDate,
                                            getMillisecondsToWaitWhileSendingEachMessage: scenario.MillisecondsToWaitWhileSendingEachMessageFn)));
 
@@ -132,6 +148,40 @@ public class Program
             temperature = Math.Round(value: RandomlyGetNextTemperature(basedOnCurrentTemperature: temperature, randomizer: usingRandomizer), digits: 2);
 
             yield return $"{deviceId}@{temperature}@{aDate:yyyy-M-d@H_m_s}";
+
+            aDate = aDate.AddSeconds(1);
+        }
+    }
+
+    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
+    {
+        var aDate = fromDate;
+        var isItAvailable = true;
+
+        while(true)
+        {
+            var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
+            isItAvailable = usingRandomizer.Next(minValue: 1, maxValue: 300) >= 280 ? !isItAvailable : isItAvailable;
+            var availability = isItAvailable ? "Produciendo" : "Parado";
+
+            yield return $"{deviceId}@{availability}@{aDate:yyyy-M-d@H_m_s}";
+
+            aDate = aDate.AddSeconds(1);
+        }
+    }
+
+    private static IEnumerable<string> GetQualityMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
+    {
+        var aDate = fromDate;
+
+        while(true)
+        {
+            var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
+            var approved = usingRandomizer.Next(minValue: 100, maxValue: 300);
+            var rejected = usingRandomizer.Next(minValue: -200, maxValue: 10);
+            var quiality = $"Aprobada@{approved}@Rechazada@{(rejected < 0 ? 0 : rejected)}";
+
+            yield return $"{deviceId}@{quiality}@{aDate:yyyy-M-d@H_m_s}";
 
             aDate = aDate.AddSeconds(1);
         }

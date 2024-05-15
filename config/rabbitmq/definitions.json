@@ -7,6 +7,22 @@
             "auto_delete": false,
             "durable": true,
             "vhost": "/"
+        },
+        {
+            "name": "Disponibilidad",
+            "type": "classic",
+			"arguments":{},
+            "auto_delete": false,
+            "durable": true,
+            "vhost": "/"
+        },
+        {
+            "name": "Calidad",
+            "type": "classic",
+			"arguments":{},
+            "auto_delete": false,
+            "durable": true,
+            "vhost": "/"
         }
     ],
     "bindings": [
@@ -15,6 +31,22 @@
             "destination": "temperature/living_room",
             "destination_type": "queue",
             "routing_key": "temperature.living_room",
+            "source": "amq.topic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {},
+            "destination": "Disponibilidad",
+            "destination_type": "queue",
+            "routing_key": "Disponibilidad",
+            "source": "amq.topic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {},
+            "destination": "Calidad",
+            "destination_type": "queue",
+            "routing_key": "Calidad",
             "source": "amq.topic",
             "vhost": "/"
         }

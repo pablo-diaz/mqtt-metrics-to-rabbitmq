@@ -3,8 +3,8 @@
         "ConnectionString": "amqp://guest:guest@localhost:5672/",
         "TemperatureMetricsConfig": {
             "Exchange": "amq.topic",
-            "Queue": "temperature/living_room",
-            "RoutingKey": "temperature.living_room",
+            "Queue": "Calidad",
+            "RoutingKey": "Calidad",
             "CompetingConsumersCount": 1
         }
     },
@@ -14,14 +14,31 @@
         "ServiceToken": "EIKFDKIF1R4zs0KrvYpJPVoYiFJ4pJfvSuEjkvOf_kgDHOTuBml5R2TJXem3zEjQkJLZZ5BPYTO-clj2-e6pgQ==",
         "Bucket": "device-metrics-db",
         "Organization": "personal",
-        "TargetMeasurement": "temperature-metric"
+        "TargetMeasurement": "quality-metric"
     },
 
     "ProcessorConfig": {
         "DeviceInfoFilePath": "/var/device-metrics-processor/device-info.csv",
         "MessageParts": [
             {
-                "Name": "temperature",
+                "Name": "skip01",
+                "Purpose": "field",
+                "Type": "string",
+                "Skip": true
+            },
+            {
+                "Name": "approved",
+                "Purpose": "field",
+                "Type": "number"
+            },
+            {
+                "Name": "skip02",
+                "Purpose": "field",
+                "Type": "string",
+                "Skip": true
+            },
+            {
+                "Name": "rejected",
                 "Purpose": "field",
                 "Type": "number"
             }

@@ -8,68 +8,34 @@ using BrokerConsumer.Infra.DTOs;
 
 using CSharpFunctionalExtensions;
 using InfluxDB.Client;
-using InfluxDB.Client.Api.Domain;
-using Newtonsoft.Json.Linq;
 
 namespace BrokerConsumer.Infra;
 
 public class MessageProcessorForInfluxDb: IMessageProcessor
 {
     private readonly InfluxDbConfig _influxConfig;
+    private readonly ProcessorConfig _processorConfig;
     private readonly InfluxDBClient _influxClient;
     private readonly WriteApiAsync _influxAsyncWritter;
 
     private List<string> _deviceAditionalInfoFields = new();
     private Dictionary<string, List<string>> _deviceAditionalInformation = new();
 
-    private class DeviceMetric
-    {
-        public string DeviceId { get; init; }
-        public decimal Temperature { get; init; }
-        public DateTime TracedAt  { get; init; }
-
-        public override string ToString() =>
-            $"[{TracedAt:yyyy-MM-dd} at {TracedAt:hh:mm:ss tt} - {DeviceId}]: Temp {Temperature}";
-
-        public DTOs.InfluxDeviceTemperatureMetric MapToInfluxMeasurement() =>
-            new DTOs.InfluxDeviceTemperatureMetric {
-                DeviceId = DeviceId,
-                Temperature = Temperature,
-                LoggedAt = TracedAt
-            };
-
-        public InfluxDB.Client.Writes.PointData MapToInfluxDataPoint(IEnumerable<(string AditionalFieldName, string WithValue)> withDeviceAditionalInfo)
-        {
-            var point = InfluxDB.Client.Writes.PointData.Measurement("device-temperature-metric");
-            point = point.Tag("device-id", DeviceId);
-            point = point.Field("temperature", Temperature);
-            point = point.Timestamp(timestamp: ToUtc(TracedAt), timeUnit: WritePrecision.Ns);
-
-            foreach(var aditionalInfo in withDeviceAditionalInfo)
-                point = point.Tag(name: aditionalInfo.AditionalFieldName,
-                                  value: aditionalInfo.WithValue.Trim().Length > 0 ? aditionalInfo.WithValue.Trim() : "N/A");
-
-            return point;
-        }
-
-        private static DateTime ToUtc(DateTime from) =>
-            from.AddHours(5);  // TODO: convert this date, considering regional settings
-    }
-    
     public MessageProcessorForInfluxDb(InfluxDbConfig influxConfig, ProcessorConfig processorConfig)
     {
         this._influxConfig = influxConfig;
+        this._processorConfig = processorConfig;
         this._influxClient = new InfluxDBClient(_influxConfig.ServiceUrl, _influxConfig.ServiceToken);
         this._influxAsyncWritter = this._influxClient.GetWriteApiAsync();
 
-        var loadDeviceInfoResult = LoadDeviceInformation(fromFile: processorConfig.DeviceInfoFilePath);
+        var loadDeviceInfoResult = LoadDeviceInformation(fromFile: _processorConfig.DeviceInfoFilePath);
         if(loadDeviceInfoResult.IsFailure)
-            throw new Exception(message: "MessageProcessorForInfluxDb couldn't be created, while reading device info. Reason: " + loadDeviceInfoResult.Error);
+            throw new Exception(message: "MessageProcessorForInfluxDb couldn't be created, while reading device aditional info. Reason: " + loadDeviceInfoResult.Error);
     }
 
     public Task Process(string message)
     {
-        var parsedMessageResult = ParseMessage(message);
+        var parsedMessageResult = ParseMessage(brokerMessage: message, messageFormatParts: _processorConfig.MessageParts);
         if(parsedMessageResult.IsFailure)
         {
             System.Console.WriteLine($"Broker message does not comply with expected format. Reason: {parsedMessageResult.Error}. Message: {message}");
@@ -80,22 +46,49 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
         return StoreMetricInInflux(parsedMessageResult.Value);
     }
 
-    private static Result<DeviceMetric> ParseMessage(string brokerMessage)
+    private static Result<DeviceMetric> ParseMessage(string brokerMessage, ProcessorConfig.Part[] messageFormatParts)
     {
-        var messageParts = brokerMessage.Split('@');
-        if(messageParts.Length != 4)
-            return Result.Failure<DeviceMetric>($"{messageParts.Length} parts were found and 4 parts were expected");
+        var expectedPartsInMessage =
+              1  // Device Id
+            + messageFormatParts.Length
+            + 2; // one for metric Date and another for metric Time
 
-        var tracedAtResult = GetDate(fromDate: messageParts[2], fromTime: messageParts[3]);
+        var messageParts = brokerMessage.Split('@');
+        if(messageParts.Length != expectedPartsInMessage)
+            return Result.Failure<DeviceMetric>($"{messageParts.Length} parts were found but {expectedPartsInMessage} parts were expected");
+
+        var tracedAtResult = GetDate(fromDate: messageParts[^2], fromTime: messageParts[^1]);
         if(tracedAtResult.IsFailure)
             return Result.Failure<DeviceMetric>(tracedAtResult.Error);
 
-        return new DeviceMetric {
-            DeviceId = messageParts[0],
-            Temperature = decimal.Parse(messageParts[1]),  // TODO: parse decimal, considering that string may have coma and not dot, for decimal separator
-            TracedAt = tracedAtResult.Value
-        };
+        (var fields, var tags) = GetFieldsAndTags(messageParts, messageFormatParts);
+        return new DeviceMetric { DeviceId = messageParts[0], Fields = fields, Tags = tags, TracedAt = tracedAtResult.Value };
     }
+
+    private static (IEnumerable<(string Name, object Value)> Fields, IEnumerable<(string Name, string Value)> Tags) GetFieldsAndTags(string[] fromMessageParts, ProcessorConfig.Part[] withMessageFormatParts)
+    {
+        var fields = new List<(string Name, object Value)>();
+        var tags = new List<(string Name, string Value)>();
+
+        for(var i=1; i < fromMessageParts.Length - 2; i++)
+        {
+            if(withMessageFormatParts[i-1].Skip)
+                continue;
+
+            if(withMessageFormatParts[i-1].Purpose == "field")
+                fields.Add((Name: withMessageFormatParts[i-1].Name, Value: Parse(value: fromMessageParts[i], withType: withMessageFormatParts[i-1].Type)));
+            else if(withMessageFormatParts[i-1].Purpose == "tag")
+                tags.Add((Name: withMessageFormatParts[i-1].Name, Value: fromMessageParts[i]));
+        }
+
+        return (Fields: fields, Tags: tags);
+    }
+
+    private static object Parse(string value, string withType) => withType switch {
+        "number" => Decimal.Parse(value),
+        "string" => value,
+        _ => value
+    };
 
     private static Result<DateTime> GetDate(string fromDate, string fromTime)
     {
@@ -112,7 +105,7 @@ public class MessageProcessorForInfluxDb: IMessageProcessor
 
     private Task StoreMetricInInflux(DeviceMetric metric)
     {
-        return _influxAsyncWritter.WritePointAsync(point: metric.MapToInfluxDataPoint(withDeviceAditionalInfo: GetDeviceAditionalInfo(basedOnMetric: metric)),
+        return _influxAsyncWritter.WritePointAsync(point: metric.MapToInfluxDataPoint(toMeasurement: _influxConfig.TargetMeasurement, withAditionalTags: GetDeviceAditionalInfo(basedOnMetric: metric)),
                                                    bucket: _influxConfig.Bucket, org: _influxConfig.Organization);
     }
 
