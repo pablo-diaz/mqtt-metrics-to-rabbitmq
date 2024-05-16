@@ -27,37 +27,59 @@ public class Program
 
     public static async Task Main(string[] args)
     {
-        await RunTestingScenarios(
-            new TestingScenario {
-                Type = TestingScenario.ScenarioType.Temperature,
-                Name = "3 devices sending 20 temperature metrics each",
-                ClientId = "PLC001",
-                DeviceCount = 3,
-                MetricCountPerDevice = 20,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            },
-            
-            new TestingScenario {
-                Type = TestingScenario.ScenarioType.Availability,
-                Name = "3 devices sending 20 availability metrics each",
-                ClientId = "PLC002",
-                DeviceCount = 3,
-                MetricCountPerDevice = 20,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            },
+        var tokenSource = new CancellationTokenSource();
 
-            new TestingScenario {
-                Type = TestingScenario.ScenarioType.Quality,
-                Name = "3 devices sending 20 quality metrics each",
-                ClientId = "PLC003",
-                DeviceCount = 3,
-                MetricCountPerDevice = 20,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            }
+        await Task.WhenAll(
+            RunKeyboardWatcherToStopRunningTestScenarios(() => tokenSource.Cancel()),
+
+            RunTestingScenarios(tokenSource.Token,
+                new TestingScenario {
+                    Type = TestingScenario.ScenarioType.Temperature,
+                    Name = "3 devices sending 20 temperature metrics each",
+                    ClientId = "PLC001",
+                    DeviceCount = 3,
+                    MetricCountPerDevice = 20,
+                    StartingFromDate = DateTime.Now,
+                    MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+                },
+                
+                new TestingScenario {
+                    Type = TestingScenario.ScenarioType.Availability,
+                    Name = "3 devices sending 20 availability metrics each",
+                    ClientId = "PLC002",
+                    DeviceCount = 3,
+                    MetricCountPerDevice = 20,
+                    StartingFromDate = DateTime.Now,
+                    MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+                },
+
+                new TestingScenario {
+                    Type = TestingScenario.ScenarioType.Quality,
+                    Name = "3 devices sending 20 quality metrics each",
+                    ClientId = "PLC003",
+                    DeviceCount = 3,
+                    MetricCountPerDevice = 20,
+                    StartingFromDate = DateTime.Now,
+                    MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+                }
+            )
         );
+    }
+
+    private static async Task RunKeyboardWatcherToStopRunningTestScenarios(Action callbackFn)
+    {
+        Console.WriteLine("Press 'Q' key to stop running test scenarios");
+
+        while(true)
+        {
+            if(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q)
+            {
+                callbackFn();
+                break;
+            }
+            else
+                await Task.Delay(millisecondsDelay: 500);
+        }
     }
 
     private static async Task<IMqttClient> ConnectToMqttBroker(string withClientId)
@@ -74,7 +96,7 @@ public class Program
         return mqttClient;
     }
 
-    private static async Task SendMetrics(int forDeviceId, Guid sessionId, IMqttClient withMqttClient, int withMetricCountPerDevice,
+    private static async Task SendMetrics(CancellationToken token, int forDeviceId, Guid sessionId, IMqttClient withMqttClient, int withMetricCountPerDevice,
         Random usingRandomizer, DateTime fromDate, TestingScenario.ScenarioType scenarioType, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
     {
         var messagesToSend = scenarioType switch {
@@ -93,6 +115,9 @@ public class Program
 
         foreach(var message in messagesToSend)
         {
+            if(token.IsCancellationRequested)
+                break;
+
             var applicationMessage = new MqttApplicationMessageBuilder()
                 .WithTopic(targetBrokerTopic)
                 .WithPayload(message)
@@ -106,11 +131,14 @@ public class Program
         }
     }
 
-    private static async Task RunTestingScenarios(params TestingScenario[] scenarios)
+    private static async Task RunTestingScenarios(CancellationToken token, params TestingScenario[] scenarios)
     {
         var randomizer = new Random(Seed: 125785);
         foreach(var scenario in scenarios)
         {
+            if(token.IsCancellationRequested)
+                break;
+
             try
             {
                 Console.WriteLine($"\n------ Running scenario '{scenario.Name}' ---------");
@@ -121,7 +149,7 @@ public class Program
                 var sessionId = Guid.NewGuid();
 
                 await Task.WhenAll(Enumerable.Range(start: 1, count: scenario.DeviceCount)
-                                   .Select(deviceId => SendMetrics(forDeviceId: deviceId, sessionId: sessionId, withMqttClient: client, scenarioType: scenario.Type,
+                                   .Select(deviceId => SendMetrics(token, forDeviceId: deviceId, sessionId: sessionId, withMqttClient: client, scenarioType: scenario.Type,
                                            withMetricCountPerDevice: scenario.MetricCountPerDevice, usingRandomizer: randomizer, fromDate: scenario.StartingFromDate,
                                            getMillisecondsToWaitWhileSendingEachMessage: scenario.MillisecondsToWaitWhileSendingEachMessageFn)));
 
