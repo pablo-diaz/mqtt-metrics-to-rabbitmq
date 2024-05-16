@@ -33,6 +33,6 @@ internal class DeviceMetric
         return point;
     }
 
-    private static DateTimeOffset ToUtc(DateTime from) =>
-        ((DateTimeOffset)from).ToUniversalTime();
+    private static DateTime ToUtc(DateTime from) =>
+        from.AddHours(5);  // UTC-5 Bogotá,Colombia
 }

@@ -30,33 +30,33 @@ public class Program
         await RunTestingScenarios(
             new TestingScenario {
                 Type = TestingScenario.ScenarioType.Temperature,
-                Name = "3 devices sending 100 temperature metrics each",
+                Name = "3 devices sending 20 temperature metrics each",
                 ClientId = "PLC001",
                 DeviceCount = 3,
-                MetricCountPerDevice = 100,
+                MetricCountPerDevice = 20,
+                StartingFromDate = DateTime.Now,
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            },
+            
+            new TestingScenario {
+                Type = TestingScenario.ScenarioType.Availability,
+                Name = "3 devices sending 20 availability metrics each",
+                ClientId = "PLC002",
+                DeviceCount = 3,
+                MetricCountPerDevice = 20,
+                StartingFromDate = DateTime.Now,
+                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
+            },
+
+            new TestingScenario {
+                Type = TestingScenario.ScenarioType.Quality,
+                Name = "3 devices sending 20 quality metrics each",
+                ClientId = "PLC003",
+                DeviceCount = 3,
+                MetricCountPerDevice = 20,
                 StartingFromDate = DateTime.Now,
                 MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
             }
-            
-            /*new TestingScenario {
-                Type = TestingScenario.ScenarioType.Availability,
-                Name = "3 devices sending 100 availability metrics each",
-                ClientId = "PLC002",
-                DeviceCount = 3,
-                MetricCountPerDevice = 100,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            }*/
-
-            /*new TestingScenario {
-                Type = TestingScenario.ScenarioType.Quality,
-                Name = "3 devices sending 100 quality metrics each",
-                ClientId = "PLC003",
-                DeviceCount = 3,
-                MetricCountPerDevice = 100,
-                StartingFromDate = DateTime.Now,
-                MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-            }*/
         );
     }
 
