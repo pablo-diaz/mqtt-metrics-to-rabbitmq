@@ -12,6 +12,9 @@ namespace SendMessagesViaMqtt;
 
 public class Program
 {
+    private static Dictionary<ConsoleKey, Func<bool>> _keyPressedHandlers = new();
+    private static bool _shouldItKeepRunningKeyboardListenerTask = true;
+
     private class TestingScenario
     {
         public enum ScenarioType { Availability, Quality, Temperature }
@@ -29,11 +32,17 @@ public class Program
     {
         var tokenSource = new CancellationTokenSource();
 
+        AddKeyboardListener(forKey: ConsoleKey.Q, withMessage: "Press 'Q' key to stop running test scenarios", callbackFn: () => {
+            tokenSource.Cancel();
+            var stopRunningKeyPressedEvents = true;
+            return stopRunningKeyPressedEvents;
+        });
+
         await Task.WhenAll(
-            RunKeyboardWatcherToStopRunningTestScenarios(() => tokenSource.Cancel()),
+            RunKeyboardListeners(),
 
             RunTestingScenarios(tokenSource.Token,
-                new TestingScenario {
+                /*new TestingScenario {
                     Type = TestingScenario.ScenarioType.Temperature,
                     Name = "3 devices sending 20 temperature metrics each",
                     ClientId = "PLC001",
@@ -41,7 +50,7 @@ public class Program
                     MetricCountPerDevice = 20,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                },
+                },*/
                 
                 new TestingScenario {
                     Type = TestingScenario.ScenarioType.Availability,
@@ -51,9 +60,9 @@ public class Program
                     MetricCountPerDevice = 20,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                },
+                }
 
-                new TestingScenario {
+                /*new TestingScenario {
                     Type = TestingScenario.ScenarioType.Quality,
                     Name = "3 devices sending 20 quality metrics each",
                     ClientId = "PLC003",
@@ -61,25 +70,43 @@ public class Program
                     MetricCountPerDevice = 20,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                }
+                }*/
             )
         );
     }
 
-    private static async Task RunKeyboardWatcherToStopRunningTestScenarios(Action callbackFn)
+    private static async Task RunKeyboardListeners()
     {
-        Console.WriteLine("Press 'Q' key to stop running test scenarios");
-
-        while(true)
+        _shouldItKeepRunningKeyboardListenerTask = true;
+        while(_shouldItKeepRunningKeyboardListenerTask)
         {
-            if(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q)
+            await Task.Delay(millisecondsDelay: 500);
+
+            if(Console.KeyAvailable)
             {
-                callbackFn();
-                break;
+                var keyPressed = Console.ReadKey(true).Key;
+                if(_keyPressedHandlers.ContainsKey(keyPressed) == false)
+                    continue;
+
+                var shouldItStopListeningForKeyPressedEvents = _keyPressedHandlers[keyPressed]();
+                if(shouldItStopListeningForKeyPressedEvents)
+                    _shouldItKeepRunningKeyboardListenerTask = false;
             }
-            else
-                await Task.Delay(millisecondsDelay: 500);
         }
+    }
+
+    private static void AddKeyboardListener(ConsoleKey forKey, Func<bool> callbackFn, string withMessage = null)
+    {
+        if(string.IsNullOrEmpty(withMessage) == false)
+            Console.WriteLine(withMessage);
+
+        _keyPressedHandlers[forKey] = callbackFn;
+    }
+
+    private static void RemoveKeyboardListener(ConsoleKey forKey)
+    {
+        if(_keyPressedHandlers.ContainsKey(forKey))
+            _keyPressedHandlers.Remove(forKey);
     }
 
     private static async Task<IMqttClient> ConnectToMqttBroker(string withClientId)
@@ -99,10 +126,30 @@ public class Program
     private static async Task SendMetrics(CancellationToken token, int forDeviceId, Guid sessionId, IMqttClient withMqttClient, int withMetricCountPerDevice,
         Random usingRandomizer, DateTime fromDate, TestingScenario.ScenarioType scenarioType, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
     {
+        var keyboardsKeysForDevices = new Dictionary<int, (ConsoleKey Key, bool IsItAvailableNow)>() {
+            { 1, (Key: ConsoleKey.A, IsItAvailableNow: true) }, { 2, (Key: ConsoleKey.S, IsItAvailableNow: true) }, { 3, (Key: ConsoleKey.D, IsItAvailableNow: true) },
+            { 4, (Key: ConsoleKey.F, IsItAvailableNow: true) }, { 5, (Key: ConsoleKey.G, IsItAvailableNow: true) }, { 6, (Key: ConsoleKey.H, IsItAvailableNow: true) },
+            { 7, (Key: ConsoleKey.J, IsItAvailableNow: true) }, { 8, (Key: ConsoleKey.K, IsItAvailableNow: true) }, { 9, (Key: ConsoleKey.L, IsItAvailableNow: true) }
+        };
+
+        if(scenarioType == TestingScenario.ScenarioType.Availability && keyboardsKeysForDevices.ContainsKey(forDeviceId))
+            AddKeyboardListener(forKey: keyboardsKeysForDevices[forDeviceId].Key, callbackFn: () => {
+                keyboardsKeysForDevices[forDeviceId] = (Key: keyboardsKeysForDevices[forDeviceId].Key, IsItAvailableNow: !keyboardsKeysForDevices[forDeviceId].IsItAvailableNow);
+                var stopRunningKeyPressedEvents = false;
+                return stopRunningKeyPressedEvents;
+            });
+
         var messagesToSend = scenarioType switch {
             TestingScenario.ScenarioType.Temperature => GetTemperatureMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
-            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
+
+            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, fromDate, isItAvailableFn: () => {
+                    return keyboardsKeysForDevices.ContainsKey(forDeviceId)
+                        ? keyboardsKeysForDevices[forDeviceId].IsItAvailableNow
+                        : true;  // always available :(
+                }).Take(withMetricCountPerDevice),
+            
             TestingScenario.ScenarioType.Quality => GetQualityMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
+
             _ => throw new Exception("Non expected scenario type")
         };
 
@@ -129,6 +176,9 @@ public class Program
 
             await Task.Delay(millisecondsDelay: getMillisecondsToWaitWhileSendingEachMessage());
         }
+
+        if(scenarioType == TestingScenario.ScenarioType.Availability && keyboardsKeysForDevices.ContainsKey(forDeviceId))
+            RemoveKeyboardListener(forKey: keyboardsKeysForDevices[forDeviceId].Key);
     }
 
     private static async Task RunTestingScenarios(CancellationToken token, params TestingScenario[] scenarios)
@@ -163,6 +213,7 @@ public class Program
         }
 
         Console.WriteLine("\n ************* Finished runnig all scenarios *********************");
+        _shouldItKeepRunningKeyboardListenerTask = false;
     }
 
     private static IEnumerable<string> GetTemperatureMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
@@ -181,16 +232,13 @@ public class Program
         }
     }
 
-    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
+    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, DateTime fromDate, Func<bool> isItAvailableFn)
     {
         var aDate = fromDate;
-        var isItAvailable = true;
-
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
-            isItAvailable = usingRandomizer.Next(minValue: 1, maxValue: 300) >= 280 ? !isItAvailable : isItAvailable;
-            var availability = isItAvailable ? "Produciendo" : "Parado";
+            var availability = isItAvailableFn() ? "Produciendo" : "Parado";
 
             yield return $"{deviceId}@{availability}@{aDate:yyyy-M-d@H_m_s}";
 

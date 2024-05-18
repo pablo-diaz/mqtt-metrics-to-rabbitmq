@@ -42,6 +42,12 @@ from(bucket: "device-metrics-db")
   |> last()
   |> yield(name: "mean")
 
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> keep(columns: ["_time", "_value", "device_id"])
+
 ------------------------------------------------------------------------------------------------------------------------------------------------
 
 isFieldInArray = (field, array) =>
