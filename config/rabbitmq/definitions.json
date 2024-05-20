@@ -9,7 +9,15 @@
             "vhost": "/"
         },
         {
-            "name": "Disponibilidad",
+            "name": "disponibilidad/principal",
+            "type": "classic",
+			"arguments":{},
+            "auto_delete": false,
+            "durable": true,
+            "vhost": "/"
+        },
+        {
+            "name": "disponibilidad/razones",
             "type": "classic",
 			"arguments":{},
             "auto_delete": false,
@@ -36,9 +44,17 @@
         },
         {
             "arguments": {},
-            "destination": "Disponibilidad",
+            "destination": "disponibilidad/principal",
             "destination_type": "queue",
-            "routing_key": "Disponibilidad",
+            "routing_key": "disponibilidad.principal",
+            "source": "amq.topic",
+            "vhost": "/"
+        },
+        {
+            "arguments": {},
+            "destination": "disponibilidad/razones",
+            "destination_type": "queue",
+            "routing_key": "disponibilidad.*",
             "source": "amq.topic",
             "vhost": "/"
         },

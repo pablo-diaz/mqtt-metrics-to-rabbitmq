@@ -3,8 +3,8 @@
         "ConnectionString": "amqp://guest:guest@brokerserver:5672/",
         "TemperatureMetricsConfig": {
             "Exchange": "amq.topic",
-            "Queue": "Disponibilidad",
-            "RoutingKey": "Disponibilidad",
+            "Queue": "disponibilidad/principal",
+            "RoutingKey": "disponibilidad.principal",
             "CompetingConsumersCount": 1
         }
     },

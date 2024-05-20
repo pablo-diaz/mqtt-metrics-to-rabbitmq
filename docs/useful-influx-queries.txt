@@ -50,6 +50,17 @@ from(bucket: "device-metrics-db")
 
 ------------------------------------------------------------------------------------------------------------------------------------------------
 
+import "generate"
+
+generate.from(
+    count: 10,
+    fn: (n) => n,
+    start: 2024-05-19T20:44:20.000Z,
+    stop:  2024-05-19T20:44:30.000Z,
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
 isFieldInArray = (field, array) =>
     if length(arr: array) == 0 then true
     else contains(value: field, set: array)
@@ -69,31 +80,39 @@ import "join"
 
 deviceMetrics = from(bucket: "device-metrics-db")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-  |> filter(fn: (r) => r["_measurement"] == "device-temperature-metric")
-  |> filter(fn: (r) => r["_field"] == "temperature")
-  |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-  |> keep(columns: ["device-id", "departmento", "ciudad", "_value", "_time"])
-  |> rename(
-        fn: (column) => {
-            newColumnName = if column == "device-id" then "deviceId" else column
-            return newColumnName
-        },
-    )
-  //|> yield(name: "coso1")
-
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> keep(columns: ["_time", "device_id", "_value"])
+  
 csvData =
     "
-deviceId,responsable,area,empresa
-154ecf95-cf5d-4b79-99f6-f0d1ab38de07_Dev0000000001,Carlos,Area01,Empresa01
-154ecf95-cf5d-4b79-99f6-f0d1ab38de07_Dev0000000002,Juan,Area50,Empresa02
-154ecf95-cf5d-4b79-99f6-f0d1ab38de07_Dev0000000003,Pedro,Area01,Empresa01
+_time,device_id,responsable
+2024-05-19T22:21:06.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:07.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:08.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:09.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:10.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:11.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:12.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:13.000000000Z,Dev0000000001,Carlos
+2024-05-19T22:21:06.000000000Z,Dev0000000002,Juan
+2024-05-19T22:21:06.000000000Z,Dev0000000003,Pedro
+2024-05-19T22:21:06.000000000Z,Dev0000000004,Camilo
 "
 
-join.inner(
-    left: deviceMetrics |> group(columns: ["deviceId"]),
-    right: csv.from(csv: csvData, mode: "raw") |> group(columns: ["deviceId"]), // |> yield(name: "coso2"),
-    on: (l, r) => l["deviceId"] == r["deviceId"],
-    as: (l, r) => ({l with responsable: r.responsable, area: r.area, empresa: r.empresa})
+join.left(
+    left: deviceMetrics
+      |> map(fn: (r) => ({r with nuevo: string(v: r["_time"]) + "___" + r["device_id"]}))
+      |> group(columns: ["nuevo"]),
+    right: csv.from(csv: csvData, mode: "raw")
+      |> map(fn: (r) => ({r with nuevo: r["_time"] + "___" + r["device_id"]}))
+      |> group(columns: ["nuevo"]),
+    on: (l, r) => l["nuevo"] == r["nuevo"],
+    as: (l, r) => ({l with responsable: r.responsable})
 )
+|> fill(column: "responsable", value: "N/A")
+|> keep(columns: ["_time", "_value", "device_id", "responsable"])
 |> group()
-|> yield(name: "coso3")
+|> yield(name: "resultado_general")
+
+https://docs.influxdata.com/flux/v0/query-data/csv/#query-csv-data-from-a-url

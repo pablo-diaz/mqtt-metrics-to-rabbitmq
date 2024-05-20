@@ -54,10 +54,10 @@ public class Program
                 
                 new TestingScenario {
                     Type = TestingScenario.ScenarioType.Availability,
-                    Name = "3 devices sending 20 availability metrics each",
+                    Name = "3 devices sending 200 availability metrics each",
                     ClientId = "PLC002",
                     DeviceCount = 3,
-                    MetricCountPerDevice = 20,
+                    MetricCountPerDevice = 200,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
                 }
@@ -156,7 +156,7 @@ public class Program
         var targetBrokerTopic = scenarioType switch {
             TestingScenario.ScenarioType.Temperature => "temperature/living_room",
             TestingScenario.ScenarioType.Quality => "Calidad",
-            TestingScenario.ScenarioType.Availability => "Disponibilidad",
+            TestingScenario.ScenarioType.Availability => "disponibilidad/principal",
             _ => throw new Exception("Non expected scenario type 2")
         };
 
