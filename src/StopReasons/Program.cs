@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
+builder.Services.AddControllers();
 
 builder.Services.AddSingleton<StopReasons.Services.IMessageReceiver, StopReasons.Infra.RabbitMqMessageReceiver>(sp =>
     new StopReasons.Infra.RabbitMqMessageReceiver(builder.Configuration.GetSection("RabbitMqConfig").Get<StopReasons.Infra.RabbitMqConfiguration>()));
@@ -24,5 +25,6 @@ app.UseRouting();
 //app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapControllers();
 
 app.Run();

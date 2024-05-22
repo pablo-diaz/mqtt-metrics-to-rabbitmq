@@ -57,6 +57,10 @@ public class AvailabilityStateManager
         _stopsPerDevice.Select(kv => (devId: kv.Key, pendings: kv.Value.GetPendingDowntimePeriodsToSetReasonsFor()))
                        .SelectMany(t => t.pendings, (t, p) => p with { deviceId = t.devId });
 
+    public IEnumerable<DowntimePeriodWithReasonSet> GetMostRecentDowntimePeriods() =>
+        _stopsPerDevice.Select(kv => (devId: kv.Key, periods: kv.Value.GetPeriodsWithReasonSet()))
+                       .SelectMany(t => t.periods, (t, p) => p with { deviceId = t.devId });
+    
     private Result Process(AvailabilityMetric metric)
     {
         if(_stopsPerDevice.ContainsKey(metric.DeviceId) == false)

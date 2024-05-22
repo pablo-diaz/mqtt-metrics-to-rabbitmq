@@ -31,6 +31,11 @@ public class DeviceDowntimePeriodsTracker
                 .Select(p => new PendingDowntimePeriodToSetReasonsFor(downtimePeriodId: p.Id, initiallyStoppedAt: p.InitiallyStoppedAt, lastStopReportedAt: p.LastStoppedMetricTracedAt))
                 .ToList();
 
+    public List<DowntimePeriodWithReasonSet> GetPeriodsWithReasonSet() =>
+        _periods.Where(p => p.MaybeReason.HasValue)
+                .Select(p => new DowntimePeriodWithReasonSet(initiallyStoppedAt: p.InitiallyStoppedAt, lastStopReportedAt: p.LastStoppedMetricTracedAt, reason: p.MaybeReason.Value))
+                .ToList();
+
     private Result TraceStoppedMetric(DateTime at, Func<long> idsGeneratorFn)
     {
         var maybeCurrentStoppedPeriod = FindCurrentStoppedPeriod();
@@ -59,6 +64,11 @@ public class DeviceDowntimePeriodsTracker
 }
 
 public record PendingDowntimePeriodToSetReasonsFor(long downtimePeriodId, DateTime initiallyStoppedAt, DateTime lastStopReportedAt)
+{
+    public string deviceId { get; set; } = "";
+}
+
+public record DowntimePeriodWithReasonSet(DateTime initiallyStoppedAt, DateTime lastStopReportedAt, string reason)
 {
     public string deviceId { get; set; } = "";
 }

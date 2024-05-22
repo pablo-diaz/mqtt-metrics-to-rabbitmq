@@ -116,3 +116,5 @@ join.left(
 |> yield(name: "resultado_general")
 
 https://docs.influxdata.com/flux/v0/query-data/csv/#query-csv-data-from-a-url
+
+http://localhost:5204/report/downtimePeriods
