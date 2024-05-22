@@ -33,4 +33,10 @@ http://host.docker.internal:8086
 
 docker build -t broker-consumer:jaime-c8.0-001 -f config/docker/BrokerConsumer/dockerfile .
 
-docker run -d --name=broker-consumer -v $(pwd)/config/docker/BrokerConsumer/settings.json:/publish/appsettings.json:ro -v $(pwd)/volumes/sample-input-files/device-info.csv://var/device-metrics-processor/device-info.csv:ro broker-consumer:jaime-c8.0-001
+docker run -d --name=broker-consumer -v $(pwd)/config/docker/BrokerConsumer/settings.json:/publish/appsettings.json:ro -v $(pwd)/docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro broker-consumer:jaime-c8.0-001
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+docker build -t stop-reasons:jaime-c8.0-001 -f config/docker/StopReasons/dockerfile .
+
+docker run -d --name=stop-reasons --env-file config/docker/StopReasons/docker-env-vars stop-reasons:jaime-c8.0-001

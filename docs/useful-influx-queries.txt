@@ -115,6 +115,36 @@ join.left(
 |> group()
 |> yield(name: "resultado_general")
 
-https://docs.influxdata.com/flux/v0/query-data/csv/#query-csv-data-from-a-url
+---------------------------------------------------------------------------------------------------
 
-http://localhost:5204/report/downtimePeriods
+import "csv"
+import "join"
+import "experimental/http"
+
+deviceMetrics = from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> filter(fn: (r) => r["_value"] == "Parado")
+  |> keep(columns: ["_time", "device_id", "_value"])
+  
+csvData = string(v: http.get(url: "http://host.docker.internal:5204/report/downtimePeriods").body)
+
+join.left(
+    left: deviceMetrics
+      |> map(fn: (r) => ({r with join_field: string(v: r["_time"]) + "___" + r["device_id"]}))
+      |> group(columns: ["join_field"]),
+    right: csv.from(csv: csvData, mode: "raw")
+      |> map(fn: (r) => ({r with join_field: r["_time"] + "___" + r["device_id"]}))
+      |> group(columns: ["join_field"]),
+    on: (l, r) => l["join_field"] == r["join_field"],
+    as: (l, r) => ({l with downtime_reason: r.downtime_reason})
+)
+|> fill(column: "downtime_reason", value: "N/A")
+|> group(columns: ["device_id", "downtime_reason"])
+|> reduce(fn: (r, accumulator) => ({total: 1 + accumulator.total}), identity: {total: 0})
+|> pivot(rowKey: ["device_id"], columnKey: ["downtime_reason"], valueColumn: "total")
+|> group()
+|> yield(name: "resultado_general")
+
+https://docs.influxdata.com/flux/v0/query-data/csv/#query-csv-data-from-a-url

@@ -1,0 +1,7 @@
+ASPNETCORE_URLS=http://0.0.0.0:80
+ASPNETCORE_ENVIRONMENT=Production
+RabbitMqConfig__ConnectionString=amqp://guest:guest@brokerserver:5672/
+RabbitMqConfig__AvailabilityMetricsConfig__Queue=disponibilidad/razones
+RabbitMqConfig__AvailabilityMetricsConfig__CompetingConsumersCount=1
+AvailabilityStateManagerConfig__WorkingStatusLabel=Produciendo
+AvailabilityStateManagerConfig__StoppedStatusLabel=Parado
