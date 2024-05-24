@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Collections.Generic;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -17,6 +18,21 @@ public class IndexModel : PageModel
     private readonly AvailabilityStateManager _availabilityState;
 
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
+    
+    public List<(string ReasonText, string ReasonCode)> ValidReasons = new() {
+        (ReasonText: "Producción 01", ReasonCode: "001"),
+        (ReasonText: "Producción 02", ReasonCode: "002"),
+        (ReasonText: "Producción 03", ReasonCode: "003"),
+        (ReasonText: "Producción 04", ReasonCode: "004"),
+        (ReasonText: "Producción 05", ReasonCode: "005"),
+        (ReasonText: "Producción 06", ReasonCode: "006"),
+        (ReasonText: "Producción 07", ReasonCode: "007"),
+        (ReasonText: "Producción 08", ReasonCode: "008"),
+        (ReasonText: "Producción 09", ReasonCode: "009"),
+        (ReasonText: "Producción 10", ReasonCode: "010"),
+        (ReasonText: "Producción 11", ReasonCode: "011"),
+        (ReasonText: "Producción 12", ReasonCode: "012")
+    };
 
     public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState)
     {

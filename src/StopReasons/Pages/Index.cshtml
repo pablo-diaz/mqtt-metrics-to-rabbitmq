@@ -24,7 +24,15 @@
                     <td>@period.DeviceId</td>
                     <td>@period.InitiallyStoppedAt</td>
                     <td>@period.LastStopReportedAt</td>
-                    <td><input type="text" name=@period.ReasonFieldName value="" /></td>
+                    <td>
+                        <select name=@period.ReasonFieldName>
+                            <option value="">Por favor seleccione una opción</option>
+                            @foreach (var validReason in Model.ValidReasons)
+                            {
+                            <option value=@validReason.ReasonCode>@validReason.ReasonText</option>
+                            }
+                        </select>
+                    </td>
                 </tr>
             }
             </tbody>
