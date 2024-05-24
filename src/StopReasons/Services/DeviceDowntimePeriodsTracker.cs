@@ -12,7 +12,7 @@ public class DeviceDowntimePeriodsTracker
 
     public Result Process(AvailabilityMetric metric, Func<long> idsGeneratorFn) => metric.Type switch {
         AvailabilityMetric.AvailabilityType.WORKING => TraceWorkingMetric(at: metric.TracedAt),
-        AvailabilityMetric.AvailabilityType.STOPPED => TraceStoppedMetric(at: metric.TracedAt, idsGeneratorFn),
+        AvailabilityMetric.AvailabilityType.STOPPED => TraceStoppedMetric(at: metric.TracedAt, maybeStopReason: metric.MaybeDowntimeReason, idsGeneratorFn),
         _ => Result.Failure($"It was not possible to process this availability metric, because its '{metric.Type}' type is not recognized")
     };
 
@@ -36,8 +36,12 @@ public class DeviceDowntimePeriodsTracker
                 .Select(p => new DowntimePeriodWithReasonSet(initiallyStoppedAt: p.InitiallyStoppedAt, lastStopReportedAt: p.LastStoppedMetricTracedAt, reason: p.MaybeReason.Value))
                 .ToList();
 
-    private Result TraceStoppedMetric(DateTime at, Func<long> idsGeneratorFn)
+    private Result TraceStoppedMetric(DateTime at, Maybe<string> maybeStopReason, Func<long> idsGeneratorFn)
     {
+        var wasStoppingReasonSetAlreadyInStopMetric = maybeStopReason.HasValue;
+        if(wasStoppingReasonSetAlreadyInStopMetric)
+            return Result.Success();  // we are ONLY interested in unKnown stopping reasons, so that users set that reason in this system
+
         var maybeCurrentStoppedPeriod = FindCurrentStoppedPeriod();
         if(maybeCurrentStoppedPeriod.HasValue)
         {

@@ -15,19 +15,23 @@ public class AvailabilityMetric
     public string DeviceId { get; }
     public AvailabilityType Type { get; }
     public DateTime TracedAt { get; }
+    public Maybe<string> MaybeDowntimeReason { get; }
 
-    private AvailabilityMetric(string deviceId, AvailabilityType type, DateTime tracedAt)
+    private static readonly string _notSetReason = "-";
+
+    private AvailabilityMetric(string deviceId, AvailabilityType type, DateTime tracedAt, Maybe<string> maybeDowntimeReason)
     {
         this.DeviceId = deviceId;
         this.Type = type;
         this.TracedAt = tracedAt;
+        this.MaybeDowntimeReason = maybeDowntimeReason;
     }
 
     public static Result<AvailabilityMetric> From(string message, (string workingStateLabel, string stoppedStateLabel) withAllowedStates)
     {
         var messageParts = message.Split('@');
-        if(messageParts.Length != 4)
-            return Result.Failure<AvailabilityMetric>($"{messageParts.Length} parts were found but 4 parts were expected");
+        if(messageParts.Length != 5)
+            return Result.Failure<AvailabilityMetric>($"{messageParts.Length} parts were found but 5 parts were expected");
 
         var tracedAtResult = GetDate(fromDate: messageParts[^2], fromTime: messageParts[^1]);
         if(tracedAtResult.IsFailure)
@@ -37,7 +41,11 @@ public class AvailabilityMetric
         if(parsedTypeResult.IsFailure)
             return Result.Failure<AvailabilityMetric>(parsedTypeResult.Error);
 
-        return new AvailabilityMetric(deviceId: messageParts[0], type: parsedTypeResult.Value, tracedAt: tracedAtResult.Value);
+        var maybeDowntimeReasonResult = GetDowntimeReason(from: messageParts[2], givenAvailability: parsedTypeResult.Value);
+        if(maybeDowntimeReasonResult.IsFailure)
+            return Result.Failure<AvailabilityMetric>(maybeDowntimeReasonResult.Error);
+
+        return new AvailabilityMetric(deviceId: messageParts[0], type: parsedTypeResult.Value, tracedAt: tracedAtResult.Value, maybeDowntimeReason: maybeDowntimeReasonResult.Value);
     }
 
     private static Result<DateTime> GetDate(string fromDate, string fromTime)
@@ -59,6 +67,12 @@ public class AvailabilityMetric
         if(from == withAllowedStates.stoppedStateLabel) return AvailabilityType.STOPPED;
         return Result.Failure<AvailabilityType>($"UnExcepted availability type '{from}'");
     }
+
+    private static Result<Maybe<string>> GetDowntimeReason(string from, AvailabilityType givenAvailability) => givenAvailability switch {
+        AvailabilityType.WORKING => Maybe<string>.None,
+        AvailabilityType.STOPPED => from == _notSetReason ? Maybe<string>.None : Maybe<string>.From(from),
+        _ => Result.Failure<Maybe<string>>($"UnExcepted availability type '{givenAvailability}'")
+    };
 
     public override string ToString() =>
         $"{DeviceId} - {Type} - {TracedAt:yyyy-MM-dd hh:mm:ss tt}";

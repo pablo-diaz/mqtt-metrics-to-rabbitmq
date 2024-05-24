@@ -142,7 +142,7 @@ public class Program
         var messagesToSend = scenarioType switch {
             TestingScenario.ScenarioType.Temperature => GetTemperatureMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
 
-            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, fromDate, isItAvailableFn: () => {
+            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, fromDate, usingRandomizer, isItAvailableFn: () => {
                     return keyboardsKeysForDevices.ContainsKey(forDeviceId)
                         ? keyboardsKeysForDevices[forDeviceId].IsItAvailableNow
                         : true;  // always available :(
@@ -232,18 +232,36 @@ public class Program
         }
     }
 
-    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, DateTime fromDate, Func<bool> isItAvailableFn)
+    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, DateTime fromDate, Random usingRandomizer, Func<bool> isItAvailableFn)
     {
         var aDate = fromDate;
+        var wasItAvailableBefore = true;
+        var nextDowntimeReason = "";
+
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
-            var availability = isItAvailableFn() ? "Produciendo" : "Parado";
+            var isItAvailable = isItAvailableFn();
+            var availability = isItAvailable ? "Produciendo" : "Parado";
 
-            yield return $"{deviceId}@{availability}@{aDate:yyyy-M-d@H_m_s}";
+            if(wasItAvailableBefore && isItAvailable == false)
+                nextDowntimeReason = GetNextDowntimeReason(usingRandomizer);
+
+            wasItAvailableBefore = isItAvailable;
+
+            var downtimeReason = isItAvailable ? "-" : nextDowntimeReason;
+
+            yield return $"{deviceId}@{availability}@{downtimeReason}@{aDate:yyyy-M-d@H_m_s}";
 
             aDate = aDate.AddSeconds(1);
         }
+    }
+
+    private static string GetNextDowntimeReason(Random usingRandomizer)
+    {
+        var reasons = new string[] {"-", "001", "002", "003", "004", "-", "005", "006", "007", "008", "-"};
+        var randomIndex = usingRandomizer.Next(minValue: 0, maxValue: reasons.Length - 1);
+        return reasons[randomIndex];
     }
 
     private static IEnumerable<string> GetQualityMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)

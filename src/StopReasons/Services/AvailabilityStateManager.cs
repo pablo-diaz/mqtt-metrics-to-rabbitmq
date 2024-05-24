@@ -10,9 +10,9 @@ namespace StopReasons.Services;
 public class AvailabilityStateManager
 {
     private readonly AvailabilityStateManagerConfig _config;
-    private readonly Dictionary<string, DeviceDowntimePeriodsTracker> _stopsPerDevice = new();
+    private readonly Dictionary<string, DeviceDowntimePeriodsTracker> _stopsPerDevice = new(); // TODO: persist state
     
-    private long _currentIdUsedForDowntimePeriods = 0;
+    private long _currentIdUsedForDowntimePeriods = 0; // TODO: persist current ID seq
     private readonly Func<long> _idGeneratorForDowntimePeriods;
 
     public AvailabilityStateManager(AvailabilityStateManagerConfig config)

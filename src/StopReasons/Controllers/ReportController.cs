@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 
 using StopReasons.Services;
+using System;
 
 namespace StopReasons.Controllers;
 
@@ -26,7 +27,7 @@ public class ReportController: ControllerBase
         "_time,device_id,downtime_reason";
 
     private static string GetDummyEntry() =>
-        "2020-01-01T00:00:01.000000000Z,NoDev,NoReason";  // this is used, so that Flux does not break on empty CSV result sets
+        "2020-01-01T00:00:01.000000000Z,NoDev,NoReason";  // this is used, so that Flux queries do not break on empty CSV result sets
 
     private string GetCsvRowsForDowntimePeriods() =>
         string.Join(separator: "\n",
@@ -35,10 +36,13 @@ public class ReportController: ControllerBase
                     var csvLinesForPeriod = new List<string>();
                     for(var date = p.initiallyStoppedAt; date <= p.lastStopReportedAt; date = date.AddSeconds(1))
                     {
-                        var adjustedDate = $"{date.AddHours(5):yyyy-MM-ddTHH:mm:ss}.000000000Z";
-                        csvLinesForPeriod.Add($"{adjustedDate},{p.deviceId},{p.reason.Replace(",", " ").Replace("\n", " ")}");
+                        var adjustedDateForInfluxQueriesPurposes = $"{NormalizeDateToUTC(date):yyyy-MM-ddTHH:mm:ss}.000000000Z";
+                        var adjustedReasonForCsvPurposes = p.reason.Replace(",", " ").Replace("\n", " ");
+                        csvLinesForPeriod.Add($"{adjustedDateForInfluxQueriesPurposes},{p.deviceId},{adjustedReasonForCsvPurposes}");
                     }
                     return csvLinesForPeriod;
                 })
         );
+
+    private static DateTime NormalizeDateToUTC(DateTime date) => date.AddHours(5);
 }
