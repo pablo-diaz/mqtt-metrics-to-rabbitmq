@@ -1,4 +1,4 @@
-device_id,habitacion,precio,ciudad,departamento
-Dev0000000001,Habitacion principal,12.56,Manizales,Caldas
-Dev0000000002,Sala,34.9,Manizales,Caldas
-Dev0000000003,Patio,23.88,Neira,Caldas
+device_id,price,location
+Dev0000000001,23.56,Manizales
+Dev0000000002,30,Manizales
+Dev0000000003,15.99,Neira
