@@ -1,3 +1,5 @@
+using StopReasons.Config;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +16,8 @@ builder.Services.AddSingleton<StopReasons.Services.AvailabilityStateManager>(sp 
     new StopReasons.Services.AvailabilityStateManager(builder.Configuration.GetSection("AvailabilityStateManagerConfig").Get<StopReasons.Services.AvailabilityStateManagerConfig>()));
 
 builder.Services.AddHostedService<StopReasons.Jobs.AvailabilityMetricsListener>();
+
+builder.Services.Configure<DowntimeReasonsConfig>(builder.Configuration.GetSection("DowntimeReasonsConfig"));
 
 var app = builder.Build();
 

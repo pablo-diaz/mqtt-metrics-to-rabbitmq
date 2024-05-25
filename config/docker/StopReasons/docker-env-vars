@@ -5,3 +5,4 @@ RabbitMqConfig__AvailabilityMetricsConfig__Queue=disponibilidad/razones
 RabbitMqConfig__AvailabilityMetricsConfig__CompetingConsumersCount=1
 AvailabilityStateManagerConfig__WorkingStatusLabel=Produciendo
 AvailabilityStateManagerConfig__StoppedStatusLabel=Parado
+DowntimeReasonsConfig__AllowedReasons=[{ "Text": "Producción 01", "Code": "001" },{ "Text": "Producción 02", "Code": "002" },{ "Text": "Producción 03", "Code": "003" },{ "Text": "Producción 04", "Code": "004" },{ "Text": "Producción 05", "Code": "005" },{ "Text": "Producción 06", "Code": "006" },{ "Text": "Producción 07", "Code": "007" },{ "Text": "Producción 08", "Code": "008" },{ "Text": "Producción 09", "Code": "009" },{ "Text": "Producción 10", "Code": "010" },{ "Text": "Producción 11", "Code": "011" },{ "Text": "Producción 12", "Code": "012" }]

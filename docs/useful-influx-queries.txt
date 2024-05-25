@@ -193,3 +193,26 @@ join.left(
 |> yield(name: "resultado_general")
 
 ---------------------------------------------------------------------------------------------------
+
+let
+    headers = [#"Content-Type" = "application/vnd.flux", #"Accept" = "application/csv", #"Authorization" = "Token EIKFDKIF1R4zs0KrvYpJPVoYiFJ4pJfvSuEjkvOf_kgDHOTuBml5R2TJXem3zEjQkJLZZ5BPYTO-clj2-e6pgQ=="],
+    theQuery = "from(bucket: ""device-metrics-db"")
+                |> range(start: -3h)
+                |> filter(fn: (r) => r[""_measurement""] == ""availability-metric"")
+                |> filter(fn: (r) => r[""_field""] == ""availability"")
+                |> filter(fn: (r) => r[""_value""] == ""Parado"")
+                |> keep(columns: [""_time"", ""device_id"", ""_value"", ""stopping_reason""])
+                |> group()",
+    postData = Text.ToBinary(theQuery),
+    response = Web.Contents(
+        "http://localhost:8086/api/v2/query?org=personal",
+        [
+            Headers = headers,
+            Content = postData
+        ]
+    ),
+    csvResponse = Csv.Document(response),
+in
+    csvResponse
+
+---------------------------------------------------------------------------------------------------
