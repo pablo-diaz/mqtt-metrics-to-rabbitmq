@@ -52,7 +52,7 @@ public class Program
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
                 },*/
                 
-                new TestingScenario {
+                /*new TestingScenario {
                     Type = TestingScenario.ScenarioType.Availability,
                     Name = "3 devices sending 200 availability metrics each",
                     ClientId = "PLC002",
@@ -60,9 +60,9 @@ public class Program
                     MetricCountPerDevice = 200,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                }
+                }*/
 
-                /*new TestingScenario {
+                new TestingScenario {
                     Type = TestingScenario.ScenarioType.Quality,
                     Name = "3 devices sending 20 quality metrics each",
                     ClientId = "PLC003",
@@ -70,7 +70,7 @@ public class Program
                     MetricCountPerDevice = 20,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                }*/
+                }
             )
         );
     }
@@ -154,7 +154,7 @@ public class Program
                         : (Available: true, MaybeStopReason: null);
                 }).Take(withMetricCountPerDevice),
             
-            TestingScenario.ScenarioType.Quality => GetQualityMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
+            TestingScenario.ScenarioType.Quality => GetQualityMetrics(forDeviceId: forDeviceId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
 
             _ => throw new Exception("Non expected scenario type")
         };
@@ -270,16 +270,18 @@ public class Program
         return reasons[randomIndex];
     }
 
-    private static IEnumerable<string> GetQualityMetrics(int forDeviceId, Guid sessionId, Random usingRandomizer, DateTime fromDate)
+    private static IEnumerable<string> GetQualityMetrics(int forDeviceId, Random usingRandomizer, DateTime fromDate)
     {
         var aDate = fromDate;
 
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
-            var approved = usingRandomizer.Next(minValue: 100, maxValue: 300);
+            var deviceVelocity = 600;  // products this device can create in 60 seconds
+            var deviceWorkingForProductId = "002";
+            var approved = usingRandomizer.Next(minValue: 1, maxValue: 10);
             var rejected = usingRandomizer.Next(minValue: -200, maxValue: 10);
-            var quiality = $"Aprobada@{approved}@Rechazada@{(rejected < 0 ? 0 : rejected)}";
+            var quiality = $"{deviceVelocity}@{deviceWorkingForProductId}@Aprobada@{approved}@Rechazada@{(rejected < 0 ? 0 : rejected)}";
 
             yield return $"{deviceId}@{quiality}@{aDate:yyyy-M-d@H_m_s}";
 

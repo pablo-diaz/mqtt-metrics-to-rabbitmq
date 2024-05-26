@@ -216,3 +216,14 @@ in
     csvResponse
 
 ---------------------------------------------------------------------------------------------------
+
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "quality-metric")
+  |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
+  |> filter(fn: (r) => r.device_id == "Dev0000000002")
+  |> group(columns: ["_time", "device_id", "product_id", "velocity"])
+  |> reduce(fn: (r, accumulator) => ({approved: (if r._field == "approved" then int(v: r._value) else 0) + accumulator.approved, rejected: (if r._field == "rejected" then int(v: r._value) else 0) + accumulator.rejected}), identity: {approved: 0, rejected: 0} )
+  |> map(fn: (r) => ({r with approved_velocity_percentage_in_seconds: 100.0 * float(v: r.approved) / (float(v: r.velocity) / 60.0), rejected_velocity_percentage_in_seconds: 100.0 * float(v: r.rejected) / (float(v: r.velocity) / 60.0) }))
+  |> group()
+  |> yield(name: "resultado")
