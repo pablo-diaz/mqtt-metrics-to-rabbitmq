@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 
 using CSharpFunctionalExtensions;
@@ -21,11 +22,11 @@ public class IndexModel : PageModel
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
     public List<(string ReasonText, string ReasonCode)> ValidReasons = new();
 
-    public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, DowntimeReasonsConfig config)
+    public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config)
     {
         _logger = logger;
         this._availabilityState = availabilityState;
-        ValidReasons = config.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
+        ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
     }
 
     public void OnGet()

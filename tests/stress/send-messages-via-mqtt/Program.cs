@@ -12,7 +12,7 @@ namespace SendMessagesViaMqtt;
 
 public class Program
 {
-    private static Dictionary<ConsoleKey, Func<bool>> _keyPressedHandlers = new();
+    private static Dictionary<ConsoleKey, Func<bool, bool>> _keyPressedHandlers = new();
     private static bool _shouldItKeepRunningKeyboardListenerTask = true;
 
     private class TestingScenario
@@ -32,7 +32,7 @@ public class Program
     {
         var tokenSource = new CancellationTokenSource();
 
-        AddKeyboardListener(forKey: ConsoleKey.Q, withMessage: "Press 'Q' key to stop running test scenarios", callbackFn: () => {
+        AddKeyboardListener(forKey: ConsoleKey.Q, withMessage: "Press 'Q' key to stop running test scenarios", callbackFn: (wasItPressedWithControlKey) => {
             tokenSource.Cancel();
             var stopRunningKeyPressedEvents = true;
             return stopRunningKeyPressedEvents;
@@ -84,18 +84,19 @@ public class Program
 
             if(Console.KeyAvailable)
             {
-                var keyPressed = Console.ReadKey(true).Key;
-                if(_keyPressedHandlers.ContainsKey(keyPressed) == false)
+                var keyPressed = Console.ReadKey(intercept: true);
+                if(_keyPressedHandlers.ContainsKey(keyPressed.Key) == false)
                     continue;
 
-                var shouldItStopListeningForKeyPressedEvents = _keyPressedHandlers[keyPressed]();
+                var wasItPressedWithControlKey = (keyPressed.Modifiers & ConsoleModifiers.Control) != 0;
+                var shouldItStopListeningForKeyPressedEvents = _keyPressedHandlers[keyPressed.Key](wasItPressedWithControlKey);
                 if(shouldItStopListeningForKeyPressedEvents)
                     _shouldItKeepRunningKeyboardListenerTask = false;
             }
         }
     }
 
-    private static void AddKeyboardListener(ConsoleKey forKey, Func<bool> callbackFn, string withMessage = null)
+    private static void AddKeyboardListener(ConsoleKey forKey, Func<bool, bool> callbackFn, string withMessage = null)
     {
         if(string.IsNullOrEmpty(withMessage) == false)
             Console.WriteLine(withMessage);
@@ -126,15 +127,20 @@ public class Program
     private static async Task SendMetrics(CancellationToken token, int forDeviceId, Guid sessionId, IMqttClient withMqttClient, int withMetricCountPerDevice,
         Random usingRandomizer, DateTime fromDate, TestingScenario.ScenarioType scenarioType, Func<int> getMillisecondsToWaitWhileSendingEachMessage)
     {
-        var keyboardsKeysForDevices = new Dictionary<int, (ConsoleKey Key, bool IsItAvailableNow)>() {
-            { 1, (Key: ConsoleKey.A, IsItAvailableNow: true) }, { 2, (Key: ConsoleKey.S, IsItAvailableNow: true) }, { 3, (Key: ConsoleKey.D, IsItAvailableNow: true) },
-            { 4, (Key: ConsoleKey.F, IsItAvailableNow: true) }, { 5, (Key: ConsoleKey.G, IsItAvailableNow: true) }, { 6, (Key: ConsoleKey.H, IsItAvailableNow: true) },
-            { 7, (Key: ConsoleKey.J, IsItAvailableNow: true) }, { 8, (Key: ConsoleKey.K, IsItAvailableNow: true) }, { 9, (Key: ConsoleKey.L, IsItAvailableNow: true) }
+        var keyboardsKeysForDevices = new Dictionary<int, (ConsoleKey Key, bool IsItAvailableNow, string MaybeStopReason)>() {
+            { 1, (Key: ConsoleKey.A, IsItAvailableNow: true, MaybeStopReason: null) }, { 2, (Key: ConsoleKey.S, IsItAvailableNow: true, MaybeStopReason: null) },
+            { 3, (Key: ConsoleKey.D, IsItAvailableNow: true, MaybeStopReason: null) }, { 4, (Key: ConsoleKey.F, IsItAvailableNow: true, MaybeStopReason: null) },
+            { 5, (Key: ConsoleKey.G, IsItAvailableNow: true, MaybeStopReason: null) }, { 6, (Key: ConsoleKey.H, IsItAvailableNow: true, MaybeStopReason: null) },
+            { 7, (Key: ConsoleKey.J, IsItAvailableNow: true, MaybeStopReason: null) }, { 8, (Key: ConsoleKey.K, IsItAvailableNow: true, MaybeStopReason: null) },
+            { 9, (Key: ConsoleKey.L, IsItAvailableNow: true, MaybeStopReason: null) }
         };
 
         if(scenarioType == TestingScenario.ScenarioType.Availability && keyboardsKeysForDevices.ContainsKey(forDeviceId))
-            AddKeyboardListener(forKey: keyboardsKeysForDevices[forDeviceId].Key, callbackFn: () => {
-                keyboardsKeysForDevices[forDeviceId] = (Key: keyboardsKeysForDevices[forDeviceId].Key, IsItAvailableNow: !keyboardsKeysForDevices[forDeviceId].IsItAvailableNow);
+            AddKeyboardListener(forKey: keyboardsKeysForDevices[forDeviceId].Key, callbackFn: (wasItPressedWithControlKey) => {
+                var newIsItAvailableNow = !keyboardsKeysForDevices[forDeviceId].IsItAvailableNow;
+                var stopReasonNotDefinedYetByDeviceUser = "-";
+                var maybeStopReason = newIsItAvailableNow ? null : wasItPressedWithControlKey ? stopReasonNotDefinedYetByDeviceUser : GetNextDowntimeReason(usingRandomizer);
+                keyboardsKeysForDevices[forDeviceId] = (Key: keyboardsKeysForDevices[forDeviceId].Key, IsItAvailableNow: newIsItAvailableNow, MaybeStopReason: maybeStopReason);
                 var stopRunningKeyPressedEvents = false;
                 return stopRunningKeyPressedEvents;
             });
@@ -142,10 +148,10 @@ public class Program
         var messagesToSend = scenarioType switch {
             TestingScenario.ScenarioType.Temperature => GetTemperatureMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
 
-            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, fromDate, usingRandomizer, isItAvailableFn: () => {
+            TestingScenario.ScenarioType.Availability => GetAvailabilityMetrics(forDeviceId: forDeviceId, fromDate, isItAvailableFn: () => {
                     return keyboardsKeysForDevices.ContainsKey(forDeviceId)
-                        ? keyboardsKeysForDevices[forDeviceId].IsItAvailableNow
-                        : true;  // always available :(
+                        ? (Available: keyboardsKeysForDevices[forDeviceId].IsItAvailableNow, MaybeStopReason: keyboardsKeysForDevices[forDeviceId].MaybeStopReason)
+                        : (Available: true, MaybeStopReason: null);
                 }).Take(withMetricCountPerDevice),
             
             TestingScenario.ScenarioType.Quality => GetQualityMetrics(forDeviceId: forDeviceId, sessionId, usingRandomizer, fromDate).Take(withMetricCountPerDevice),
@@ -232,7 +238,7 @@ public class Program
         }
     }
 
-    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, DateTime fromDate, Random usingRandomizer, Func<bool> isItAvailableFn)
+    private static IEnumerable<string> GetAvailabilityMetrics(int forDeviceId, DateTime fromDate, Func<(bool Available, string MaybeStopReason)> isItAvailableFn)
     {
         var aDate = fromDate;
         var wasItAvailableBefore = true;
@@ -241,11 +247,11 @@ public class Program
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 10, paddingChar: '0');
-            var isItAvailable = isItAvailableFn();
+            (var isItAvailable, var maybeStopReason) = isItAvailableFn();
             var availability = isItAvailable ? "Produciendo" : "Parado";
 
             if(wasItAvailableBefore && isItAvailable == false)
-                nextDowntimeReason = GetNextDowntimeReason(usingRandomizer);
+                nextDowntimeReason = maybeStopReason;
 
             wasItAvailableBefore = isItAvailable;
 
@@ -259,7 +265,7 @@ public class Program
 
     private static string GetNextDowntimeReason(Random usingRandomizer)
     {
-        var reasons = new string[] {"-", "001", "002", "003", "004", "-", "005", "006", "007", "008", "-"};
+        var reasons = new string[] {"001", "002", "003", "004", "005", "006", "007", "008", "009"};
         var randomIndex = usingRandomizer.Next(minValue: 0, maxValue: reasons.Length - 1);
         return reasons[randomIndex];
     }
