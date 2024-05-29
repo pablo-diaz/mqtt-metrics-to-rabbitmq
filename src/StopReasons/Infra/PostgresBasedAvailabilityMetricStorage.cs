@@ -86,12 +86,10 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
 
     public void Dispose()
     {
-        System.Console.WriteLine("[StopReasons.Infra.PostgresBasedAvailabilityMetricStorage] Disposing");
         if(_connection != null)
         {
             _connection.Close();
             _connection.Dispose();
-            System.Console.WriteLine("[StopReasons.Infra.PostgresBasedAvailabilityMetricStorage] Postgres connection was dispossed successfully");
         }
     }
 }
