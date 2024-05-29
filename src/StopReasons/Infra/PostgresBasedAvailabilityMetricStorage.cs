@@ -11,7 +11,7 @@ using CSharpFunctionalExtensions;
 
 namespace StopReasons.Infra;
 
-public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage, IDisposable
+public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
 {
     private record DbDto(long id, string device_id, DateTime initially_stopped_at, DateTime last_stopped_metric_traced_at, string maybe_stopping_reason)
     {

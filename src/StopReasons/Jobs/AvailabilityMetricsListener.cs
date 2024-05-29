@@ -23,6 +23,7 @@ public class AvailabilityMetricsListener: IHostedService, IDisposable
 
     public void Dispose()
     {
+        _availabilityStateManager?.Dispose();
         _messageReceiver?.Dispose();
         _serviceScope?.Dispose();
     }

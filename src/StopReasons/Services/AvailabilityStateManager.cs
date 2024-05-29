@@ -7,7 +7,7 @@ using CSharpFunctionalExtensions;
 
 namespace StopReasons.Services;
 
-public class AvailabilityStateManager
+public class AvailabilityStateManager: IDisposable
 {
     private readonly AvailabilityStateManagerConfig _config;
     private readonly IAvailabilityMetricStorage _persistence;
@@ -121,5 +121,10 @@ public class AvailabilityStateManager
 
             _stopsPerDevice[metric.DeviceId].AddPeriod(fromPersistenceMetric: metric);
         }
+    }
+
+    public void Dispose()
+    {
+        _persistence?.Dispose();
     }
 }

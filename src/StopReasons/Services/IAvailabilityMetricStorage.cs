@@ -6,7 +6,7 @@ using CSharpFunctionalExtensions;
 
 namespace StopReasons.Services;
 
-public interface IAvailabilityMetricStorage
+public interface IAvailabilityMetricStorage: IDisposable
 {
     public record AvailabilityMetricInStorage(long Id, string DeviceId, DateTime InitiallyStoppedAt, DateTime LastStoppedMetricTracedAt, Maybe<string> MaybeReason);
 
