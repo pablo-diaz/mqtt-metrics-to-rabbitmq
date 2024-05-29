@@ -1,6 +1,6 @@
 {
     "RabbitMqConfig": {
-        "ConnectionString": "amqp://guest:guest@host.docker.internal:5672/",
+        "ConnectionString": "amqp://guest:guest@brokerserver:5672/",
         "TemperatureMetricsConfig": {
             "Exchange": "amq.topic",
             "Queue": "disponibilidad/principal",
@@ -10,7 +10,7 @@
     },
 
     "InfluxDbSetup": {
-        "ServiceUrl": "http://host.docker.internal:8086",
+        "ServiceUrl": "http://timeseriesserver:8086",
         "ServiceToken": "EIKFDKIF1R4zs0KrvYpJPVoYiFJ4pJfvSuEjkvOf_kgDHOTuBml5R2TJXem3zEjQkJLZZ5BPYTO-clj2-e6pgQ==",
         "Bucket": "device-metrics-db",
         "Organization": "personal",

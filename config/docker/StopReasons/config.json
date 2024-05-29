@@ -1,0 +1,43 @@
+{
+    "Logging": {
+      "LogLevel": {
+        "Default": "Information",
+        "Microsoft.AspNetCore": "Warning"
+      }
+    },
+    "AllowedHosts": "*",
+  
+    "RabbitMqConfig": {
+      "ConnectionString": "amqp://guest:guest@brokerserver:5672/",
+      "AvailabilityMetricsConfig": {
+          "Queue": "disponibilidad/razones",
+          "CompetingConsumersCount": 1
+      }
+    },
+  
+    "AvailabilityStateManagerConfig": {
+      "WorkingStatusLabel": "Produciendo",
+      "StoppedStatusLabel": "Parado"
+    },
+
+    "DowntimeReasonsConfig": {
+      "AllowedReasons": [
+        { "Text": "Producción 01", "Code": "001" },
+        { "Text": "Producción 02", "Code": "002" },
+        { "Text": "Producción 03", "Code": "003" },
+        { "Text": "Producción 04", "Code": "004" },
+        { "Text": "Producción 05", "Code": "005" },
+        { "Text": "Producción 06", "Code": "006" },
+        { "Text": "Producción 07", "Code": "007" },
+        { "Text": "Producción 08", "Code": "008" },
+        { "Text": "Producción 09", "Code": "009" },
+        { "Text": "Producción 10", "Code": "010" },
+        { "Text": "Producción 11", "Code": "011" },
+        { "Text": "Producción 12", "Code": "012" }
+      ]
+    },
+
+    "PostgresConfig": {
+      "ConnectionString": "Server=stopreasonsstorage;Port=5432;Database=stopreasons;User Id=stopreasonsdbo;Password=srdbo;"
+    }
+}
