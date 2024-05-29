@@ -10,9 +10,15 @@ public class DeviceDowntimePeriodsTracker
 {
     private List<DowntimePeriod> _periods = new();
 
-    public Result Process(AvailabilityMetric metric, Func<long> idsGeneratorFn) => metric.Type switch {
-        AvailabilityMetric.AvailabilityType.WORKING => TraceWorkingMetric(at: metric.TracedAt),
-        AvailabilityMetric.AvailabilityType.STOPPED => TraceStoppedMetric(at: metric.TracedAt, maybeStopReason: metric.MaybeDowntimeReason, idsGeneratorFn),
+    public void AddPeriod(IAvailabilityMetricStorage.AvailabilityMetricInStorage fromPersistenceMetric)
+    {
+        _periods.Add(DowntimePeriod.For(fromPersistenceMetric));
+    }
+
+    public Result Process(AvailabilityMetric metric, Func<long> idsGeneratorFn, (Action<long> OnAdding, Action<long> OnUpdatingLastStoppedAt) listeners) => metric.Type switch {
+        AvailabilityMetric.AvailabilityType.WORKING => TraceWorkingMetric(at: metric.TracedAt, onUpdatingLastStoppedAt: listeners.OnUpdatingLastStoppedAt),
+        AvailabilityMetric.AvailabilityType.STOPPED => TraceStoppedMetric(at: metric.TracedAt, maybeStopReason: metric.MaybeDowntimeReason, idsGeneratorFn, 
+                                                                          onAdding: listeners.OnAdding, onUpdatingLastStoppedAt: listeners.OnUpdatingLastStoppedAt),
         _ => Result.Failure($"It was not possible to process this availability metric, because its '{metric.Type}' type is not recognized")
     };
 
@@ -36,30 +42,35 @@ public class DeviceDowntimePeriodsTracker
                 .Select(p => new DowntimePeriodWithReasonSet(initiallyStoppedAt: p.InitiallyStoppedAt, lastStopReportedAt: p.LastStoppedMetricTracedAt, reason: p.MaybeReason.Value))
                 .ToList();
 
-    private Result TraceStoppedMetric(DateTime at, Maybe<string> maybeStopReason, Func<long> idsGeneratorFn)
+    private Result TraceStoppedMetric(DateTime at, Maybe<string> maybeStopReason, Func<long> idsGeneratorFn, Action<long> onAdding, Action<long> onUpdatingLastStoppedAt)
     {
-        var wasStoppingReasonSetAlreadyInStopMetric = maybeStopReason.HasValue;
-        if(wasStoppingReasonSetAlreadyInStopMetric)
+        var isStoppingMetricSetWithKnownReason = maybeStopReason.HasValue;
+        if(isStoppingMetricSetWithKnownReason)
             return Result.Success();  // we are ONLY interested in unKnown stopping reasons, so that users set that reason in this system
 
         var maybeCurrentStoppedPeriod = FindCurrentStoppedPeriod();
         if(maybeCurrentStoppedPeriod.HasValue)
         {
             maybeCurrentStoppedPeriod.Value.TraceNewStopMetric(at);
+            onUpdatingLastStoppedAt(maybeCurrentStoppedPeriod.Value.Id);
             return Result.Success();
         }
 
-        _periods.Add(DowntimePeriod.For(stoppedAt: at, getNextIdFn: idsGeneratorFn));
+        var newPeriodId = idsGeneratorFn();
+        onAdding(newPeriodId);
+        _periods.Add(DowntimePeriod.For(stoppedAt: at, withId: newPeriodId)); // TODO: 3 - Add new period
         return Result.Success();
     }
 
-    private Result TraceWorkingMetric(DateTime at)
+    private Result TraceWorkingMetric(DateTime at, Action<long> onUpdatingLastStoppedAt)
     {
         var maybeCurrentStoppedPeriod = FindCurrentStoppedPeriod();
-        if(maybeCurrentStoppedPeriod.HasNoValue)
+        var isWorkingMetricForAnAlreadyWorkingDevice = maybeCurrentStoppedPeriod.HasNoValue;
+        if(isWorkingMetricForAnAlreadyWorkingDevice)
             return Result.Success();
 
         maybeCurrentStoppedPeriod.Value.Finish(at);
+        onUpdatingLastStoppedAt(maybeCurrentStoppedPeriod.Value.Id);
         return Result.Success();
     }
 

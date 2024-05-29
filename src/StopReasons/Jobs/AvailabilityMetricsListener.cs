@@ -35,7 +35,7 @@ public class AvailabilityMetricsListener: IHostedService, IDisposable
             _messageReceiver = _serviceScope.ServiceProvider.GetRequiredService<IMessageReceiver>();
             _availabilityStateManager = _serviceScope.ServiceProvider.GetRequiredService<AvailabilityStateManager>();
             System.Console.WriteLine("Listening on availability messages ...");
-            return _messageReceiver.StartReceivingMessages(message => _availabilityStateManager.Process(message));
+            return _messageReceiver.StartReceivingMessages(async message => await _availabilityStateManager.Process(message));
         }
         catch(Exception ex)
         {

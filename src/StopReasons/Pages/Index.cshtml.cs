@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using Microsoft.AspNetCore.Mvc;
@@ -37,7 +38,7 @@ public class IndexModel : PageModel
             .ToArray();
     }
 
-    public IActionResult OnPostAsync()
+    public async Task<IActionResult> OnPostAsync()
     {
         if (!ModelState.IsValid)
             return Page();
@@ -58,7 +59,7 @@ public class IndexModel : PageModel
                 continue;
             }
 
-            _availabilityState.SetDowntimeReason(reason: maybeReason.Value, forDeviceId: maybePeriodFound.Value.deviceId, forDowntimePeriodId: maybePeriodFound.Value.downtimePeriodId);
+            await _availabilityState.SetDowntimeReason(reason: maybeReason.Value, forDeviceId: maybePeriodFound.Value.deviceId, forDowntimePeriodId: maybePeriodFound.Value.downtimePeriodId);
             System.Console.WriteLine($"Period reason set successfully for '{downtimePeriodId}' downtime period id");
         }
 

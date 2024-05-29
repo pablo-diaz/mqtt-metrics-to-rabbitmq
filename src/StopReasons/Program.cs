@@ -1,3 +1,4 @@
+using StopReasons.Infra;
 using StopReasons.Config;
 
 using Microsoft.AspNetCore.Builder;
@@ -12,8 +13,10 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<StopReasons.Services.IMessageReceiver, StopReasons.Infra.RabbitMqMessageReceiver>(sp =>
     new StopReasons.Infra.RabbitMqMessageReceiver(builder.Configuration.GetSection("RabbitMqConfig").Get<StopReasons.Infra.RabbitMqConfiguration>()));
 
-builder.Services.AddSingleton<StopReasons.Services.AvailabilityStateManager>(sp =>
-    new StopReasons.Services.AvailabilityStateManager(builder.Configuration.GetSection("AvailabilityStateManagerConfig").Get<StopReasons.Services.AvailabilityStateManagerConfig>()));
+builder.Services.AddSingleton<StopReasons.Services.AvailabilityStateManager>(sp => new StopReasons.Services.AvailabilityStateManager(
+        config: builder.Configuration.GetSection("AvailabilityStateManagerConfig").Get<StopReasons.Services.AvailabilityStateManagerConfig>(),
+        persistence: new PostgresBasedAvailabilityMetricStorage(config: builder.Configuration.GetSection("PostgresConfig").Get<StopReasons.Infra.PostgresConfig>())
+    ));
 
 builder.Services.AddHostedService<StopReasons.Jobs.AvailabilityMetricsListener>();
 

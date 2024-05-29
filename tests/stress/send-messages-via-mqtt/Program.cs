@@ -52,7 +52,7 @@ public class Program
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
                 },*/
                 
-                /*new TestingScenario {
+                new TestingScenario {
                     Type = TestingScenario.ScenarioType.Availability,
                     Name = "3 devices sending 200 availability metrics each",
                     ClientId = "PLC002",
@@ -60,9 +60,9 @@ public class Program
                     MetricCountPerDevice = 200,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                }*/
+                }
 
-                new TestingScenario {
+                /*new TestingScenario {
                     Type = TestingScenario.ScenarioType.Quality,
                     Name = "3 devices sending 20 quality metrics each",
                     ClientId = "PLC003",
@@ -70,7 +70,7 @@ public class Program
                     MetricCountPerDevice = 20,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMessageFn = () => 1_000
-                }
+                }*/
             )
         );
     }

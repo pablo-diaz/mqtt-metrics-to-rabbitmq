@@ -1,0 +1,3 @@
+POSTGRES_USER=dev
+POSTGRES_PASSWORD=prueba2024
+PGDATA=/var/lib/postgresql/data/pgdata

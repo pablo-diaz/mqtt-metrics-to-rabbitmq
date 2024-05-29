@@ -12,16 +12,22 @@ public class DowntimePeriod
     public bool IsItStillStopped { get; private set; }
     public Maybe<string> MaybeReason { get; private set; } = Maybe<string>.None;
 
-    private DowntimePeriod(long id, DateTime initiallyStoppedAt, DateTime lastStoppedMetricTracedAt, bool isItStillStopped)
+    private DowntimePeriod(long id, DateTime initiallyStoppedAt, DateTime lastStoppedMetricTracedAt, bool isItStillStopped, Maybe<string> maybeReason)
     {
         Id = id;
         InitiallyStoppedAt = initiallyStoppedAt;
         LastStoppedMetricTracedAt = lastStoppedMetricTracedAt;
         IsItStillStopped = isItStillStopped;
+        MaybeReason = maybeReason;
     }
 
-    public static DowntimePeriod For(DateTime stoppedAt, Func<long> getNextIdFn) =>
-        new DowntimePeriod(id: getNextIdFn(), initiallyStoppedAt: stoppedAt, lastStoppedMetricTracedAt: stoppedAt, isItStillStopped: true);
+    public static DowntimePeriod For(DateTime stoppedAt, long withId) =>
+        new DowntimePeriod(id: withId, initiallyStoppedAt: stoppedAt, lastStoppedMetricTracedAt: stoppedAt, isItStillStopped: true, maybeReason: Maybe<string>.None);
+
+    public static DowntimePeriod For(IAvailabilityMetricStorage.AvailabilityMetricInStorage fromPersistenceMetric) =>
+        new DowntimePeriod(id: fromPersistenceMetric.Id, initiallyStoppedAt: fromPersistenceMetric.InitiallyStoppedAt,
+                           lastStoppedMetricTracedAt: fromPersistenceMetric.LastStoppedMetricTracedAt,
+                           isItStillStopped: false, maybeReason: fromPersistenceMetric.MaybeReason);
 
     public void TraceNewStopMetric(DateTime forDate)
     {
