@@ -45,6 +45,6 @@ export const options = {
 };
 
 export default function () {
-    const serviceUrl = "http://localhost:5204";
+    const serviceUrl = "http://localhost:81";
     http.get(`${serviceUrl}/report/downtimePeriods`);
 }
