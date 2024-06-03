@@ -66,8 +66,14 @@ public sealed class Scenario
         (
             forKey: Devices[forDeviceId - 1].KeyToBind,
             callbackFn: keyPressedModifiers => {
-                Devices[forDeviceId - 1].ToggleAvailability(shouldSetKnownReasonWhenStopped: keyPressedModifiers.WithCtrl == false, usingRandomizer);
 
+                if(keyPressedModifiers.NoModifiersWerePressed())
+                    Devices[forDeviceId - 1].ToggleAvailability(shouldSetKnownReasonWhenStopped: true, usingRandomizer);
+                else if(keyPressedModifiers.WithCtrl)
+                    Devices[forDeviceId - 1].ToggleAvailability(shouldSetKnownReasonWhenStopped: false, usingRandomizer);
+                else if(keyPressedModifiers.WithShift)
+                    Devices[forDeviceId - 1].IncrementRejectedCount();
+                
                 var stopRunningKeyPressedEvents = false;
                 return stopRunningKeyPressedEvents;
             },

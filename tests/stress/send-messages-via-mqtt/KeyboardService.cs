@@ -6,7 +6,10 @@ namespace SendMessagesViaMqtt;
 
 public sealed class KeyboardService
 {
-    public record KeyPressedModifiers(bool WithCtrl, bool WithAlt, bool WithShift);
+    public record KeyPressedModifiers(bool WithCtrl, bool WithAlt, bool WithShift)
+    {
+        public bool NoModifiersWerePressed() => WithCtrl == false && WithAlt == false && WithShift == false;
+    }
 
     private Dictionary<ConsoleKey, Func<KeyPressedModifiers, bool>> _keyPressedHandlers = new();
     private bool _shouldItKeepRunningKeyboardListenerTask = true;
@@ -16,7 +19,7 @@ public sealed class KeyboardService
         _shouldItKeepRunningKeyboardListenerTask = true;
         while(_shouldItKeepRunningKeyboardListenerTask)
         {
-            await Task.Delay(millisecondsDelay: 500);
+            await Task.Delay(millisecondsDelay: 50);
 
             if(Console.KeyAvailable)
             {

@@ -18,6 +18,7 @@ public sealed class Device
     
     private bool _isItAvailableNow = true;
     private string _maybeStopReason = null;
+    private int _currentRejectedCount = 0;
 
     public void ToggleAvailability(bool shouldSetKnownReasonWhenStopped, Random usingRandomizer)
     {
@@ -29,10 +30,20 @@ public sealed class Device
                              : _StopReasonNotDefinedYetByDeviceUser;
     }
 
+    public void IncrementRejectedCount()
+    {
+        _currentRejectedCount++;
+    }
+
     private string GetNextDowntimeReason(Random usingRandomizer)
     {
         var randomIndex = usingRandomizer.Next(minValue: 0, maxValue: _DowntimeReasons.Length - 1);
         return _DowntimeReasons[randomIndex];
+    }
+
+    private void ResetRejectedCount()
+    {
+        _currentRejectedCount = 0;
     }
 
     public IEnumerable<(string AvailabilityMetric, string QualityMetric)> GetMetrics(int forDeviceId, DateTime startingFromDate)
@@ -42,17 +53,22 @@ public sealed class Device
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 3, paddingChar: '0');
+
             var availability = _isItAvailableNow ? "Produciendo" : "Parado";
             var downtimeReason = _isItAvailableNow ? _StopReasonWhenAvailable : _maybeStopReason;
 
-            var approved = _isItAvailableNow ? GetApprovedCount() : _ApprovedCountWhenStopped;
-            var rejected = _isItAvailableNow ? 0 : _RejectedCountWhenStopped;
-            
-            yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}@{aDate:yyyy-M-d@H_m_s}",
-                          QualityMetric: $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}@{aDate:yyyy-M-d@H_m_s}");
+            var approvedCount = GetApprovedCount() - _currentRejectedCount;
+            if(approvedCount < 0)
+                approvedCount = 0;
 
+            var approved = _isItAvailableNow ? approvedCount : _ApprovedCountWhenStopped;
+            var rejected = _isItAvailableNow ? _currentRejectedCount : _RejectedCountWhenStopped;
+            
             aDate = aDate.AddSeconds(1);
+            ResetRejectedCount();
+
+            yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}@{aDate:yyyy-M-d@H_m_s}",
+                          QualityMetric:      $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}@{aDate:yyyy-M-d@H_m_s}");
         }
     }
-
 }
