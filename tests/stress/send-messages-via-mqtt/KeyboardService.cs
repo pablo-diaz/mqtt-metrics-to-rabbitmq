@@ -6,7 +6,9 @@ namespace SendMessagesViaMqtt;
 
 public sealed class KeyboardService
 {
-    private Dictionary<ConsoleKey, Func<bool, bool>> _keyPressedHandlers = new();
+    public record KeyPressedModifiers(bool WithCtrl, bool WithAlt, bool WithShift);
+
+    private Dictionary<ConsoleKey, Func<KeyPressedModifiers, bool>> _keyPressedHandlers = new();
     private bool _shouldItKeepRunningKeyboardListenerTask = true;
 
     public async Task RunKeyboardListeners()
@@ -22,15 +24,19 @@ public sealed class KeyboardService
                 if(_keyPressedHandlers.ContainsKey(keyPressed.Key) == false)
                     continue;
 
-                var wasItPressedWithControlKey = (keyPressed.Modifiers & ConsoleModifiers.Control) != 0;
-                var shouldItStopListeningForKeyPressedEvents = _keyPressedHandlers[keyPressed.Key](wasItPressedWithControlKey);
+                var modifiers = new KeyPressedModifiers(
+                    WithCtrl: (keyPressed.Modifiers & ConsoleModifiers.Control) != 0,
+                    WithAlt: (keyPressed.Modifiers & ConsoleModifiers.Alt) != 0,
+                    WithShift: (keyPressed.Modifiers & ConsoleModifiers.Shift) != 0);
+
+                var shouldItStopListeningForKeyPressedEvents = _keyPressedHandlers[keyPressed.Key](modifiers);
                 if(shouldItStopListeningForKeyPressedEvents)
                     _shouldItKeepRunningKeyboardListenerTask = false;
             }
         }
     }
 
-    public void AddKeyboardListener(ConsoleKey forKey, Func<bool, bool> callbackFn, string withMessage = null)
+    public void AddKeyboardListener(ConsoleKey forKey, Func<KeyPressedModifiers, bool> callbackFn, string withMessage = null)
     {
         if(string.IsNullOrEmpty(withMessage) == false)
             Console.WriteLine(withMessage);

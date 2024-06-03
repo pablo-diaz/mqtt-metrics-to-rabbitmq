@@ -104,18 +104,18 @@ services:
     networks:
       - backend_space
 
-  temperature_connector:
-    image: "broker-consumer:jaime-c8.0-001"
-    volumes:
-      - ./config/docker/BrokerConsumer/temperature-settings.json:/publish/appsettings.json:ro
-      - ./docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro
-    depends_on:
-      brokerserver:
-        condition: service_healthy
-      timeseriesserver:
-        condition: service_started
-    networks:
-      - backend_space
+  #temperature_connector:
+  #  image: "broker-consumer:jaime-c8.0-001"
+  #  volumes:
+  #    - ./config/docker/BrokerConsumer/temperature-settings.json:/publish/appsettings.json:ro
+  #    - ./docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro
+  #  depends_on:
+  #    brokerserver:
+  #      condition: service_healthy
+  #    timeseriesserver:
+  #      condition: service_started
+  #  networks:
+  #    - backend_space
 
 networks:
   backend_space:
