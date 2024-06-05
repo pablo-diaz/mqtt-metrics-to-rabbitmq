@@ -217,13 +217,198 @@ in
 
 ---------------------------------------------------------------------------------------------------
 
+// Throughput and Quality per minute
+
+lookupForProductName = (given_product_id) =>
+    if      given_product_id == "001" then "Ron Viejo de Caldas"
+    else if given_product_id == "002" then "Aguardiente Amarillo"
+    else if given_product_id == "003" then "Aguardiente Tapa Azul"
+    else if given_product_id == "004" then "Aguardiente Nariño"
+    else given_product_id
+
+mapProductName = (forRow) =>
+  ({forRow with product_name: lookupForProductName(given_product_id: forRow.product_id)})
+
+getQualityValueForField = (forRow, fieldToCheck, defaultValue) =>
+  if forRow._field == fieldToCheck then int(v: forRow._value) else defaultValue
+
+getRunningApproveSum = (forRow, withCurrentSum) =>
+  getQualityValueForField(forRow: forRow, fieldToCheck: "approved", defaultValue: 0) + withCurrentSum.approved
+
+getRunningRejectSum = (forRow, withCurrentSum) =>
+  getQualityValueForField(forRow: forRow, fieldToCheck: "rejected", defaultValue: 0) + withCurrentSum.rejected
+
+getQualityRunningSum = (forRow, withCurrentSum) =>
+  ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum)})
+
+getThroughput = (sumInMin, velocityPerMin) =>
+  float(v: sumInMin) / float(v: velocityPerMin)
+
+mapThroughput = (forRow) =>
+  ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, velocityPerMin: forRow.velocity),
+                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, velocityPerMin: forRow.velocity),
+                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity),
+                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity) })
+
+getQuality = (sumInMinForApproved, sumInMinForRejected) =>
+  float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))
+
+mapQuality = (forRow) =>
+  ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),
+                quality_per_min: getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected) })
+
 from(bucket: "device-metrics-db")
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "quality-metric")
   |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
-  |> filter(fn: (r) => r.device_id == "Dev0000000002")
-  |> group(columns: ["_time", "device_id", "product_id", "velocity"])
-  |> reduce(fn: (r, accumulator) => ({approved: (if r._field == "approved" then int(v: r._value) else 0) + accumulator.approved, rejected: (if r._field == "rejected" then int(v: r._value) else 0) + accumulator.rejected}), identity: {approved: 0, rejected: 0} )
-  |> map(fn: (r) => ({r with approved_velocity_percentage_in_seconds: 100.0 * float(v: r.approved) / (float(v: r.velocity) / 60.0), rejected_velocity_percentage_in_seconds: 100.0 * float(v: r.rejected) / (float(v: r.velocity) / 60.0) }))
-  |> group()
+  |> group(columns: ["device_id", "velocity", "product_id"])
+  |> window(every: 1m)
+  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0} )
+  |> map(fn: (r) => mapThroughput(forRow: r))
+  |> map(fn: (r) => mapQuality(forRow: r))
+  |> map(fn: (r) => mapProductName(forRow: r))
+  |> group(columns: ["device_id"])
   |> yield(name: "resultado")
+
+---------------------------------------------------------------------------------------------------
+
+// Availability per minute
+
+getAvailabilityValueForField = (forRow, fieldToCheck, defaultValue) =>
+  if forRow._value == fieldToCheck then 1 else defaultValue
+
+getRunningUptimeSum = (forRow, withCurrentSum) => 
+  getAvailabilityValueForField(forRow: forRow, fieldToCheck: "Produciendo", defaultValue: 0) + withCurrentSum.uptime
+
+getRunningDowntimeSum = (forRow, withCurrentSum) =>
+  getAvailabilityValueForField(forRow: forRow, fieldToCheck: "Parado", defaultValue: 0) + withCurrentSum.downtime
+
+getAvailabilityRunningSum = (forRow, withCurrentSum) =>
+  ({uptime: getRunningUptimeSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    downtime: getRunningDowntimeSum(forRow: forRow, withCurrentSum: withCurrentSum)})
+
+getAvailability = (sumInMinForUptime, sumInMinForDowntime) =>
+  float(v: sumInMinForUptime) / (float(v: sumInMinForUptime) + float(v: sumInMinForDowntime))
+
+mapAvailability = (forRow) =>
+  ({forRow with overall_availability_per_min: 100.0 * getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime),
+                availability_per_min: getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime) })
+
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> group(columns: ["device_id"])
+  |> window(every: 1m)
+  |> reduce(fn: (r, accumulator) => getAvailabilityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {uptime: 0, downtime: 0} )
+  |> map(fn: (r) => mapAvailability(forRow: r))
+  |> group(columns: ["device_id"])
+  |> yield(name: "resultado")
+
+---------------------------------------------------------------------------------------------------
+
+// Throughput, Availability and Quality per minute
+
+import "join"
+
+getAvailabilityValueForField = (forRow, fieldToCheck, defaultValue) =>
+  if forRow._value == fieldToCheck then 1 else defaultValue
+
+getRunningUptimeSum = (forRow, withCurrentSum) => 
+  getAvailabilityValueForField(forRow: forRow, fieldToCheck: "Produciendo", defaultValue: 0) + withCurrentSum.uptime
+
+getRunningDowntimeSum = (forRow, withCurrentSum) =>
+  getAvailabilityValueForField(forRow: forRow, fieldToCheck: "Parado", defaultValue: 0) + withCurrentSum.downtime
+
+getAvailabilityRunningSum = (forRow, withCurrentSum) =>
+  ({uptime: getRunningUptimeSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    downtime: getRunningDowntimeSum(forRow: forRow, withCurrentSum: withCurrentSum)})
+
+getAvailability = (sumInMinForUptime, sumInMinForDowntime) =>
+  float(v: sumInMinForUptime) / (float(v: sumInMinForUptime) + float(v: sumInMinForDowntime))
+
+mapAvailability = (forRow) =>
+  ({forRow with overall_availability_per_min: 100.0 * getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime),
+                availability_per_min: getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime) })
+
+lookupForProductName = (given_product_id) =>
+    if      given_product_id == "001" then "Ron Viejo de Caldas"
+    else if given_product_id == "002" then "Aguardiente Amarillo"
+    else if given_product_id == "003" then "Aguardiente Tapa Azul"
+    else if given_product_id == "004" then "Aguardiente Nariño"
+    else given_product_id
+
+mapProductName = (forRow) =>
+  ({forRow with product_name: lookupForProductName(given_product_id: forRow.product_id)})
+
+getQualityValueForField = (forRow, fieldToCheck, defaultValue) =>
+  if forRow._field == fieldToCheck then int(v: forRow._value) else defaultValue
+
+getRunningApproveSum = (forRow, withCurrentSum) =>
+  getQualityValueForField(forRow: forRow, fieldToCheck: "approved", defaultValue: 0) + withCurrentSum.approved
+
+getRunningRejectSum = (forRow, withCurrentSum) =>
+  getQualityValueForField(forRow: forRow, fieldToCheck: "rejected", defaultValue: 0) + withCurrentSum.rejected
+
+getQualityRunningSum = (forRow, withCurrentSum) =>
+  ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum)})
+
+getThroughput = (sumInMin, velocityPerMin) =>
+  float(v: sumInMin) / float(v: velocityPerMin)
+
+mapThroughput = (forRow) =>
+  ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, velocityPerMin: forRow.velocity),
+                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, velocityPerMin: forRow.velocity),
+                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity),
+                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity) })
+
+getQuality = (sumInMinForApproved, sumInMinForRejected) =>
+  float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))
+
+mapQuality = (forRow) =>
+  ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),
+                quality_per_min: getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected) })
+
+getEfficiencyOee = (availability, quality, throughput) =>
+  availability * quality * throughput
+
+mapEfficiencyOee = (forRow) =>
+  ({forRow with overall_efficiency_per_min: 100.0 * getEfficiencyOee(availability: forRow.availability_per_min, quality: forRow.quality_per_min, throughput: forRow.throughput_per_min),
+                efficiency_per_min: getEfficiencyOee(availability: forRow.availability_per_min, quality: forRow.quality_per_min, throughput: forRow.throughput_per_min) })
+
+qualityMetrics = from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "quality-metric")
+  |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
+  |> group(columns: ["device_id", "velocity", "product_id"])
+  |> window(every: 1m)
+  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0} )
+  |> map(fn: (r) => mapThroughput(forRow: r))
+  |> map(fn: (r) => mapQuality(forRow: r))
+  |> map(fn: (r) => mapProductName(forRow: r))
+  |> group(columns: ["device_id"])
+
+availabilityMetrics = from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> group(columns: ["device_id"])
+  |> window(every: 1m)
+  |> reduce(fn: (r, accumulator) => getAvailabilityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {uptime: 0, downtime: 0} )
+  |> map(fn: (r) => mapAvailability(forRow: r))
+  |> group(columns: ["device_id"])
+
+join.left(
+    left: qualityMetrics
+      |> map(fn: (r) => ({r with join_field: string(v: r["_stop"]) + "___" + r["device_id"]}))
+      |> group(columns: ["join_field"]),
+    right: availabilityMetrics
+      |> map(fn: (r) => ({r with join_field: string(v: r["_stop"]) + "___" + r["device_id"]}))
+      |> group(columns: ["join_field"]),
+    on: (l, r) => l["join_field"] == r["join_field"],
+    as: (l, r) => ({l with uptime: r.uptime, downtime: r.downtime, overall_availability_per_min: r.overall_availability_per_min, availability_per_min: r.availability_per_min})
+)
+|> map(fn: (r) => mapEfficiencyOee(forRow: r))
+|> group()

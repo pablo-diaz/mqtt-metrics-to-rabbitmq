@@ -23,7 +23,7 @@ public class Program
 
             RunTestingScenarios(whenFinished: () => keyboard.StopKeyboardListener(), randomizer, tokenSource.Token,
                 /*new Scenario() {
-                    Name = "1 device sending 60 metrics once every 5 secs",
+                    Name = "1 device sending metrics once every 5 seconds, for an overall of 60 metrics total",
                     ClientId = "PLC001",
                     Devices = new Device[] {
                         new Device() { KeyToBind = ConsoleKey.A, Velocity = 600, WorkingForProductId = "002", GetApprovedCount = () => randomizer.Next(minValue: 1, maxValue: 10) },
@@ -36,22 +36,22 @@ public class Program
                 },*/
                 
                 new Scenario() {
-                    Name = "3 devices sending 60 metrics each every second",
+                    Name = "3 devices sending metrics every second, for an overall of 240 metrics total per device",
                     ClientId = "PLC002",
                     Devices = new Device[] {
                         new Device() { KeyToBind = ConsoleKey.A, Velocity = 600, WorkingForProductId = "002", GetApprovedCount = () => randomizer.Next(minValue: 1, maxValue: 10) },
                         new Device() { KeyToBind = ConsoleKey.S, Velocity = 600, WorkingForProductId = "002", GetApprovedCount = () => randomizer.Next(minValue: 1, maxValue: 10) },
                         new Device() { KeyToBind = ConsoleKey.D, Velocity = 600, WorkingForProductId = "002", GetApprovedCount = () => randomizer.Next(minValue: 1, maxValue: 10) }
                     },
-                    MetricCountToSendPerDevice = 60,
+                    MetricCountToSendPerDevice = 240,
                     StartingFromDate = DateTime.Now,
                     MillisecondsToWaitWhileSendingEachMetric = 1_000,
                     AddKeyboardListener = theParams => keyboard.AddKeyboardListener(forKey: theParams.forKey, callbackFn: theParams.callbackFn, withMessage: theParams.withMessage),
                     RemoveKeyboardListener = key => keyboard.RemoveKeyboardListener(forKey: key)
-                },
+                }
 
-                new Scenario() {
-                    Name = "20 devices sending 500 metrics each every second",
+                /*new Scenario() {
+                    Name = "20 devices sending metrics every second, for an overall of 500 metrics total per device",
                     ClientId = "PLC003",
                     Devices = new Device[] {
                         new Device() { KeyToBind = ConsoleKey.A, Velocity = 600, WorkingForProductId = "005", GetApprovedCount = () => randomizer.Next(minValue: 1, maxValue: 10) },
@@ -80,7 +80,7 @@ public class Program
                     MillisecondsToWaitWhileSendingEachMetric = 1_000,
                     AddKeyboardListener = theParams => keyboard.AddKeyboardListener(forKey: theParams.forKey, callbackFn: theParams.callbackFn, withMessage: theParams.withMessage),
                     RemoveKeyboardListener = key => keyboard.RemoveKeyboardListener(forKey: key)
-                }
+                }*/
             )
         );
 
