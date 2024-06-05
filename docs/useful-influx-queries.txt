@@ -411,4 +411,5 @@ join.left(
     as: (l, r) => ({l with uptime: r.uptime, downtime: r.downtime, overall_availability_per_min: r.overall_availability_per_min, availability_per_min: r.availability_per_min})
 )
 |> map(fn: (r) => mapEfficiencyOee(forRow: r))
-|> group()
+|> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, oee: r.overall_efficiency_per_min}))
+|> pivot(rowKey: ["minuto"], columnKey: ["dispositivo"], valueColumn: "oee")
