@@ -53,22 +53,35 @@ public sealed class Device
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 3, paddingChar: '0');
-
-            var availability = _isItAvailableNow ? "Produciendo" : "Parado";
-            var downtimeReason = _isItAvailableNow ? _StopReasonWhenAvailable : _maybeStopReason;
-
-            var approvedCount = GetApprovedCount() - _currentRejectedCount;
-            if(approvedCount < 0)
-                approvedCount = 0;
-
-            var approved = _isItAvailableNow ? approvedCount : _ApprovedCountWhenStopped;
-            var rejected = _isItAvailableNow ? _currentRejectedCount : _RejectedCountWhenStopped;
+            (var availability, var downtimeReason) = GetAvailabilityMetrics();
+            (var approved, var rejected) = GetQualityMetrics();
+            var dateToSend = $"{aDate:yyyy-M-d@H_m_s}";
             
             aDate = aDate.AddSeconds(1);
             ResetRejectedCount();
 
-            yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}@{aDate:yyyy-M-d@H_m_s}",
-                          QualityMetric:      $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}@{aDate:yyyy-M-d@H_m_s}");
+            yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}@{dateToSend:yyyy-M-d@H_m_s}",
+                          QualityMetric:      $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}@{dateToSend:yyyy-M-d@H_m_s}");
         }
+    }
+
+    private (string Availability, string DowntimeReason) GetAvailabilityMetrics() =>
+        (Availability:   _isItAvailableNow ? "Produciendo" : "Parado",
+         DowntimeReason: _isItAvailableNow ? _StopReasonWhenAvailable : _maybeStopReason);
+
+    private (int ApprovedCount, int RejectedCount) GetQualityMetrics()
+    {
+        var approvedCount = GetApprovedCount();
+        var adjustedApprovedCount = approvedCount - _currentRejectedCount;
+
+        var adjustedRejectedCount = _currentRejectedCount;
+        if(adjustedApprovedCount < 0)
+        {
+            adjustedApprovedCount = 0;
+            adjustedRejectedCount = approvedCount;
+        }
+
+        return (ApprovedCount: _isItAvailableNow ? adjustedApprovedCount : _ApprovedCountWhenStopped,
+                RejectedCount: _isItAvailableNow ? adjustedRejectedCount : _RejectedCountWhenStopped);
     }
 }
