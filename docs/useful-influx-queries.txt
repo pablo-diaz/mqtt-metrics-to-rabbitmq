@@ -240,16 +240,22 @@ getRunningRejectSum = (forRow, withCurrentSum) =>
 
 getQualityRunningSum = (forRow, withCurrentSum) =>
   ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),
-    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum)})
+    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    seconds_in_min: 0.5 + withCurrentSum.seconds_in_min })
 
-getThroughput = (sumInMin, velocityPerMin) =>
-  float(v: sumInMin) / float(v: velocityPerMin)
+getAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>
+  float(v: velocityPerMin) / (60.0 / seconds_in_min)
 
-mapThroughput = (forRow) =>
-  ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, velocityPerMin: forRow.velocity),
-                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, velocityPerMin: forRow.velocity),
-                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity),
-                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity) })
+getThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>
+  float(v: sumInMin) / adjustedVelocityForRunningMinute
+
+mapThroughput = (forRow) => {
+  adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)
+  return ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, adjustedVelocityForRunningMinute: adjustedVelocity),
+                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),
+                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),
+                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity) })
+}
 
 getQuality = (sumInMinForApproved, sumInMinForRejected) =>
   float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))
@@ -264,7 +270,7 @@ from(bucket: "device-metrics-db")
   |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
   |> group(columns: ["device_id", "velocity", "product_id"])
   |> window(every: 1m)
-  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0} )
+  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )
   |> map(fn: (r) => mapThroughput(forRow: r))
   |> map(fn: (r) => mapQuality(forRow: r))
   |> map(fn: (r) => mapProductName(forRow: r))
@@ -353,16 +359,22 @@ getRunningRejectSum = (forRow, withCurrentSum) =>
 
 getQualityRunningSum = (forRow, withCurrentSum) =>
   ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),
-    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum)})
+    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    seconds_in_min: 0.5 + withCurrentSum.seconds_in_min })
 
-getThroughput = (sumInMin, velocityPerMin) =>
-  float(v: sumInMin) / float(v: velocityPerMin)
+getAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>
+  float(v: velocityPerMin) / (60.0 / seconds_in_min)
 
-mapThroughput = (forRow) =>
-  ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, velocityPerMin: forRow.velocity),
-                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, velocityPerMin: forRow.velocity),
-                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity),
-                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, velocityPerMin: forRow.velocity) })
+getThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>
+  float(v: sumInMin) / adjustedVelocityForRunningMinute
+
+mapThroughput = (forRow) => {
+  adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)
+  return ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, adjustedVelocityForRunningMinute: adjustedVelocity),
+                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),
+                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),
+                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity) })
+}
 
 getQuality = (sumInMinForApproved, sumInMinForRejected) =>
   float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))
@@ -384,7 +396,7 @@ qualityMetrics = from(bucket: "device-metrics-db")
   |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
   |> group(columns: ["device_id", "velocity", "product_id"])
   |> window(every: 1m)
-  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0} )
+  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )
   |> map(fn: (r) => mapThroughput(forRow: r))
   |> map(fn: (r) => mapQuality(forRow: r))
   |> map(fn: (r) => mapProductName(forRow: r))
