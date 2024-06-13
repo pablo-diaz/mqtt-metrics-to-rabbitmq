@@ -2,16 +2,20 @@ using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
+using ShouldItStopListeningForKeyPressedEvents = bool;
+
 namespace SendMessagesViaMqtt;
 
 public sealed class KeyboardService
 {
+    public delegate ShouldItStopListeningForKeyPressedEvents HandleKeyPressedEventFn(KeyPressedModifiers keyWasPressedMaybeWithSomeOtherControlKeys); 
+
     public record KeyPressedModifiers(bool WithCtrl, bool WithAlt, bool WithShift)
     {
         public bool NoModifiersWerePressed() => WithCtrl == false && WithAlt == false && WithShift == false;
     }
 
-    private Dictionary<ConsoleKey, Func<KeyPressedModifiers, bool>> _keyPressedHandlers = new();
+    private Dictionary<ConsoleKey, HandleKeyPressedEventFn> _keyPressedHandlers = new();
     private bool _shouldItKeepRunningKeyboardListenerTask = true;
 
     public async Task RunKeyboardListeners()
@@ -39,12 +43,12 @@ public sealed class KeyboardService
         }
     }
 
-    public void AddKeyboardListener(ConsoleKey forKey, Func<KeyPressedModifiers, bool> callbackFn, string withMessage = null)
+    public void AddKeyboardListener(ConsoleKey forKey, HandleKeyPressedEventFn keyPressedHandler, string withMessage = null)
     {
         if(string.IsNullOrEmpty(withMessage) == false)
             Console.WriteLine(withMessage);
 
-        _keyPressedHandlers[forKey] = callbackFn;
+        _keyPressedHandlers[forKey] = keyPressedHandler;
     }
 
     public void RemoveKeyboardListener(ConsoleKey forKey)

@@ -425,3 +425,68 @@ join.left(
 |> map(fn: (r) => mapEfficiencyOee(forRow: r))
 |> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, oee: r.overall_efficiency_per_min}))
 |> pivot(rowKey: ["minuto"], columnKey: ["dispositivo"], valueColumn: "oee")
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Quality per minute
+
+lookupForProductName = (given_product_id) =>
+    if      given_product_id == "001" then "Ron Viejo de Caldas"
+    else if given_product_id == "002" then "Aguardiente Amarillo"
+    else if given_product_id == "003" then "Aguardiente Tapa Azul"
+    else if given_product_id == "004" then "Aguardiente Nariño"
+    else given_product_id
+
+mapProductName = (forRow) =>
+  ({forRow with product_name: lookupForProductName(given_product_id: forRow.product_id)})
+
+getQualityValueForField = (forRow, fieldToCheck, defaultValue) =>
+  if forRow._field == fieldToCheck then int(v: forRow._value) else defaultValue
+
+getRunningApproveSum = (forRow, withCurrentSum) =>
+  getQualityValueForField(forRow: forRow, fieldToCheck: "approved", defaultValue: 0) + withCurrentSum.approved
+
+getRunningRejectSum = (forRow, withCurrentSum) =>
+  getQualityValueForField(forRow: forRow, fieldToCheck: "rejected", defaultValue: 0) + withCurrentSum.rejected
+
+getQualityRunningSum = (forRow, withCurrentSum) =>
+  ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),
+    seconds_in_min: 0.5 + withCurrentSum.seconds_in_min })
+
+getAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>
+  float(v: velocityPerMin) / (60.0 / seconds_in_min)
+
+getThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>
+  float(v: sumInMin) / adjustedVelocityForRunningMinute
+
+mapThroughput = (forRow) => {
+  adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)
+  return ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, adjustedVelocityForRunningMinute: adjustedVelocity),
+                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),
+                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),
+                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity) })
+}
+
+getQuality = (sumInMinForApproved, sumInMinForRejected) => {
+  totalProduced = float(v: sumInMinForApproved) + float(v: sumInMinForRejected)
+  return if totalProduced == 0 then 0.0 else float(v: sumInMinForApproved) / totalProduced
+}
+
+mapQuality = (forRow) =>
+  ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),
+                quality_per_min: getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected) })
+
+from(bucket: "device-metrics-db")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "quality-metric")
+  |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
+  |> group(columns: ["device_id", "velocity", "product_id"])
+  |> window(every: 1m)
+  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )
+  |> map(fn: (r) => mapThroughput(forRow: r))
+  |> map(fn: (r) => mapQuality(forRow: r))
+  |> map(fn: (r) => mapProductName(forRow: r))
+  |> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, calidad: r.overall_quality_per_min}))
+  |> pivot(rowKey: ["minuto"], columnKey: ["dispositivo"], valueColumn: "calidad")
+  |> yield(name: "resultado")

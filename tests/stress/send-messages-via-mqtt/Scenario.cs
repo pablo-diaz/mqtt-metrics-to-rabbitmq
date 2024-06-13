@@ -8,6 +8,9 @@ namespace SendMessagesViaMqtt;
 
 public sealed class Scenario
 {
+    public delegate void AddKeyboardListenerFn(ConsoleKey forKey, KeyboardService.HandleKeyPressedEventFn keyPressedHandler, string withMessage);
+    public delegate void RemoveKeyboardListenerFn(ConsoleKey stopListeningEventsFromKey);
+
     private const string _AvailabilityMqttTopicName = "disponibilidad/principal";
     private const string _QualityMqttTopicName = "Calidad";
 
@@ -18,8 +21,8 @@ public sealed class Scenario
     public DateTime StartingFromDate { get; init; }
     public int MillisecondsToWaitWhileSendingEachMetric { get; init; }
 
-    public Action<(ConsoleKey forKey, Func<KeyboardService.KeyPressedModifiers, bool> callbackFn, string withMessage)> AddKeyboardListener { get; init; }
-    public Action<ConsoleKey> RemoveKeyboardListener { get; init; }
+    public AddKeyboardListenerFn AddKeyboardListener { get; init; }
+    public RemoveKeyboardListenerFn RemoveKeyboardListener { get; init; }
 
     public async Task RunAsync(Random usingRandomizer, CancellationToken token)
     {
@@ -43,7 +46,8 @@ public sealed class Scenario
 
     private async Task SendMetricsAsync(int forDeviceId, Broker withBroker, Random usingRandomizer, CancellationToken token)
     {
-        AddKeyboardListener(BindKeyToDeviceId(forDeviceId, usingRandomizer));
+        var bindingContext = BindKeyToDeviceId(forDeviceId, usingRandomizer);
+        AddKeyboardListener(forKey: bindingContext.forKey, keyPressedHandler: bindingContext.keyPressedHandler, withMessage: bindingContext.withMessage);
 
         foreach(var metrics in Devices[forDeviceId - 1].GetMetrics(forDeviceId, StartingFromDate).Take(MetricCountToSendPerDevice))
         {
@@ -62,10 +66,10 @@ public sealed class Scenario
         RemoveKeyboardListener(Devices[forDeviceId - 1].KeyToBind);
     }
 
-    private (ConsoleKey forKey, Func<KeyboardService.KeyPressedModifiers, bool> callbackFn, string withMessage) BindKeyToDeviceId(int forDeviceId, Random usingRandomizer) =>
+    private (ConsoleKey forKey, KeyboardService.HandleKeyPressedEventFn keyPressedHandler, string withMessage) BindKeyToDeviceId(int forDeviceId, Random usingRandomizer) =>
         (
             forKey: Devices[forDeviceId - 1].KeyToBind,
-            callbackFn: keyPressedModifiers => {
+            keyPressedHandler: keyPressedModifiers => {
 
                 if(keyPressedModifiers.NoModifiersWerePressed())
                     Devices[forDeviceId - 1].ToggleAvailability(shouldSetKnownReasonWhenStopped: true, usingRandomizer);

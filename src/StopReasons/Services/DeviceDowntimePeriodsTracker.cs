@@ -58,7 +58,7 @@ public class DeviceDowntimePeriodsTracker
 
         var newPeriodId = idsGeneratorFn();
         onAdding(newPeriodId);
-        _periods.Add(DowntimePeriod.For(stoppedAt: at, withId: newPeriodId)); // TODO: 3 - Add new period
+        _periods.Add(DowntimePeriod.For(stoppedAt: at, withId: newPeriodId));
         return Result.Success();
     }
 

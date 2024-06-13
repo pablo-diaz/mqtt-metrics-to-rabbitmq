@@ -5,6 +5,8 @@ namespace SendMessagesViaMqtt;
 
 public sealed class Device
 {
+    public delegate int GetApprovedCountFn();
+
     private const string _StopReasonNotDefinedYetByDeviceUser = "-";
     private const string _StopReasonWhenAvailable = "-";
     private const int _ApprovedCountWhenStopped = 0;
@@ -14,7 +16,7 @@ public sealed class Device
     public ConsoleKey KeyToBind { get; init; }
     public int Velocity { get; init; }
     public string WorkingForProductId { get; init; }
-    public Func<int> GetApprovedCount { get; init; }
+    public GetApprovedCountFn GetApprovedCount { get; init; }
     
     private bool _isItAvailableNow = true;
     private string _maybeStopReason = null;

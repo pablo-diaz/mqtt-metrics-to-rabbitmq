@@ -1,4 +1,4 @@
-device_id,price,location
-Dev0000000001,23.56,Manizales
-Dev0000000002,30,Manizales
-Dev0000000003,15.99,Neira
+device_id,linea
+Dev001,linea01
+Dev002,linea01
+Dev003,linea02
