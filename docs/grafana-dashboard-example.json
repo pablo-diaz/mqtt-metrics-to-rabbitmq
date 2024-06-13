@@ -1,0 +1,476 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 3,
+    "links": [],
+    "panels": [
+      {
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fdksva1y07ldsc"
+        },
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "% Eficiencia OEE",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 10,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "10.4.2",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "fdksva1y07ldsc"
+            },
+            "query": "import \"join\"\r\n\r\ngetAvailabilityValueForField = (forRow, fieldToCheck, defaultValue) =>\r\n  if forRow._value == fieldToCheck then 1 else defaultValue\r\n\r\ngetRunningUptimeSum = (forRow, withCurrentSum) => \r\n  getAvailabilityValueForField(forRow: forRow, fieldToCheck: \"Produciendo\", defaultValue: 0) + withCurrentSum.uptime\r\n\r\ngetRunningDowntimeSum = (forRow, withCurrentSum) =>\r\n  getAvailabilityValueForField(forRow: forRow, fieldToCheck: \"Parado\", defaultValue: 0) + withCurrentSum.downtime\r\n\r\ngetAvailabilityRunningSum = (forRow, withCurrentSum) =>\r\n  ({uptime: getRunningUptimeSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    downtime: getRunningDowntimeSum(forRow: forRow, withCurrentSum: withCurrentSum)})\r\n\r\ngetAvailability = (sumInMinForUptime, sumInMinForDowntime) =>\r\n  float(v: sumInMinForUptime) / (float(v: sumInMinForUptime) + float(v: sumInMinForDowntime))\r\n\r\nmapAvailability = (forRow) =>\r\n  ({forRow with overall_availability_per_min: 100.0 * getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime),\r\n                availability_per_min: getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime) })\r\n\r\nlookupForProductName = (given_product_id) =>\r\n    if      given_product_id == \"001\" then \"Ron Viejo de Caldas\"\r\n    else if given_product_id == \"002\" then \"Aguardiente Amarillo\"\r\n    else if given_product_id == \"003\" then \"Aguardiente Tapa Azul\"\r\n    else if given_product_id == \"004\" then \"Aguardiente Nariño\"\r\n    else given_product_id\r\n\r\nmapProductName = (forRow) =>\r\n  ({forRow with product_name: lookupForProductName(given_product_id: forRow.product_id)})\r\n\r\ngetQualityValueForField = (forRow, fieldToCheck, defaultValue) =>\r\n  if forRow._field == fieldToCheck then int(v: forRow._value) else defaultValue\r\n\r\ngetRunningApproveSum = (forRow, withCurrentSum) =>\r\n  getQualityValueForField(forRow: forRow, fieldToCheck: \"approved\", defaultValue: 0) + withCurrentSum.approved\r\n\r\ngetRunningRejectSum = (forRow, withCurrentSum) =>\r\n  getQualityValueForField(forRow: forRow, fieldToCheck: \"rejected\", defaultValue: 0) + withCurrentSum.rejected\r\n\r\ngetQualityRunningSum = (forRow, withCurrentSum) =>\r\n  ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    seconds_in_min: 0.5 + withCurrentSum.seconds_in_min })\r\n\r\ngetAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>\r\n  float(v: velocityPerMin) / (60.0 / seconds_in_min)\r\n\r\ngetThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>\r\n  float(v: sumInMin) / adjustedVelocityForRunningMinute\r\n\r\nmapThroughput = (forRow) => {\r\n  adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)\r\n  return ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity) })\r\n}\r\n\r\ngetQuality = (sumInMinForApproved, sumInMinForRejected) =>\r\n  float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))\r\n\r\nmapQuality = (forRow) =>\r\n  ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),\r\n                quality_per_min: getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected) })\r\n\r\ngetEfficiencyOee = (availability, quality, throughput) =>\r\n  availability * quality * throughput\r\n\r\nmapEfficiencyOee = (forRow) =>\r\n  ({forRow with overall_efficiency_per_min: 100.0 * getEfficiencyOee(availability: forRow.availability_per_min, quality: forRow.quality_per_min, throughput: forRow.throughput_per_min),\r\n                efficiency_per_min: getEfficiencyOee(availability: forRow.availability_per_min, quality: forRow.quality_per_min, throughput: forRow.throughput_per_min) })\r\n\r\nqualityMetrics = from(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"quality-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"approved\" or r[\"_field\"] == \"rejected\")\r\n  |> group(columns: [\"device_id\", \"velocity\", \"product_id\"])\r\n  |> window(every: 1m)\r\n  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )\r\n  |> map(fn: (r) => mapThroughput(forRow: r))\r\n  |> map(fn: (r) => mapQuality(forRow: r))\r\n  |> map(fn: (r) => mapProductName(forRow: r))\r\n  |> group(columns: [\"device_id\"])\r\n\r\navailabilityMetrics = from(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"availability-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"availability\")\r\n  |> group(columns: [\"device_id\"])\r\n  |> window(every: 1m)\r\n  |> reduce(fn: (r, accumulator) => getAvailabilityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {uptime: 0, downtime: 0} )\r\n  |> map(fn: (r) => mapAvailability(forRow: r))\r\n  |> group(columns: [\"device_id\"])\r\n\r\njoin.left(\r\n    left: qualityMetrics\r\n      |> map(fn: (r) => ({r with join_field: string(v: r[\"_stop\"]) + \"___\" + r[\"device_id\"]}))\r\n      |> group(columns: [\"join_field\"]),\r\n    right: availabilityMetrics\r\n      |> map(fn: (r) => ({r with join_field: string(v: r[\"_stop\"]) + \"___\" + r[\"device_id\"]}))\r\n      |> group(columns: [\"join_field\"]),\r\n    on: (l, r) => l[\"join_field\"] == r[\"join_field\"],\r\n    as: (l, r) => ({l with uptime: r.uptime, downtime: r.downtime, overall_availability_per_min: r.overall_availability_per_min, availability_per_min: r.availability_per_min})\r\n)\r\n|> map(fn: (r) => mapEfficiencyOee(forRow: r))\r\n|> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, oee: r.overall_efficiency_per_min}))\r\n|> pivot(rowKey: [\"minuto\"], columnKey: [\"dispositivo\"], valueColumn: \"oee\")\r\n",
+            "refId": "A"
+          }
+        ],
+        "title": "OEE - Eficiencia por Equipo",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fdksva1y07ldsc"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 10,
+          "x": 10,
+          "y": 0
+        },
+        "id": 3,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "10.4.2",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "fdksva1y07ldsc"
+            },
+            "query": "lookupForProductName = (given_product_id) =>\r\n    if      given_product_id == \"001\" then \"Ron Viejo de Caldas\"\r\n    else if given_product_id == \"002\" then \"Aguardiente Amarillo\"\r\n    else if given_product_id == \"003\" then \"Aguardiente Tapa Azul\"\r\n    else if given_product_id == \"004\" then \"Aguardiente Nariño\"\r\n    else given_product_id\r\n\r\nmapProductName = (forRow) =>\r\n  ({forRow with product_name: lookupForProductName(given_product_id: forRow.product_id)})\r\n\r\ngetQualityValueForField = (forRow, fieldToCheck, defaultValue) =>\r\n  if forRow._field == fieldToCheck then int(v: forRow._value) else defaultValue\r\n\r\ngetRunningApproveSum = (forRow, withCurrentSum) =>\r\n  getQualityValueForField(forRow: forRow, fieldToCheck: \"approved\", defaultValue: 0) + withCurrentSum.approved\r\n\r\ngetRunningRejectSum = (forRow, withCurrentSum) =>\r\n  getQualityValueForField(forRow: forRow, fieldToCheck: \"rejected\", defaultValue: 0) + withCurrentSum.rejected\r\n\r\ngetQualityRunningSum = (forRow, withCurrentSum) =>\r\n  ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    seconds_in_min: 0.5 + withCurrentSum.seconds_in_min })\r\n\r\ngetAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>\r\n  float(v: velocityPerMin) / (60.0 / seconds_in_min)\r\n\r\ngetThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>\r\n  float(v: sumInMin) / adjustedVelocityForRunningMinute\r\n\r\nmapThroughput = (forRow) => {\r\n  adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)\r\n  return ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity) })\r\n}\r\n\r\ngetQuality = (sumInMinForApproved, sumInMinForRejected) => {\r\n  totalProduced = float(v: sumInMinForApproved) + float(v: sumInMinForRejected)\r\n  return if totalProduced == 0 then 0.0 else float(v: sumInMinForApproved) / totalProduced\r\n}\r\n\r\nmapQuality = (forRow) =>\r\n  ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),\r\n                quality_per_min: getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected) })\r\n\r\nfrom(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"quality-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"approved\" or r[\"_field\"] == \"rejected\")\r\n  |> group(columns: [\"device_id\", \"velocity\", \"product_id\"])\r\n  |> window(every: 1m)\r\n  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )\r\n  |> map(fn: (r) => mapThroughput(forRow: r))\r\n  |> map(fn: (r) => mapQuality(forRow: r))\r\n  |> map(fn: (r) => mapProductName(forRow: r))\r\n  //|> group(columns: [\"device_id\"])\r\n  |> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, calidad: r.overall_quality_per_min}))\r\n  |> pivot(rowKey: [\"minuto\"], columnKey: [\"dispositivo\"], valueColumn: \"calidad\")\r\n  |> yield(name: \"resultado\")",
+            "refId": "A"
+          }
+        ],
+        "title": "Calidad por Equipo por Minuto",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fdksva1y07ldsc"
+        },
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [
+              {
+                "options": {
+                  "from": 0,
+                  "result": {
+                    "color": "red",
+                    "index": 0
+                  },
+                  "to": 50
+                },
+                "type": "range"
+              },
+              {
+                "options": {
+                  "from": 51,
+                  "result": {
+                    "color": "yellow",
+                    "index": 1
+                  },
+                  "to": 80
+                },
+                "type": "range"
+              },
+              {
+                "options": {
+                  "from": 81,
+                  "result": {
+                    "color": "green",
+                    "index": 2
+                  },
+                  "to": 100
+                },
+                "type": "range"
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 10,
+          "x": 0,
+          "y": 8
+        },
+        "id": 2,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "horizontal",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": true,
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "10.4.2",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "fdksva1y07ldsc"
+            },
+            "query": "getAvailabilityValueForField = (forRow, fieldToCheck, defaultValue) =>\r\n  if forRow._value == fieldToCheck then 1 else defaultValue\r\n\r\ngetRunningUptimeSum = (forRow, withCurrentSum) => \r\n  getAvailabilityValueForField(forRow: forRow, fieldToCheck: \"Produciendo\", defaultValue: 0) + withCurrentSum.uptime\r\n\r\ngetRunningDowntimeSum = (forRow, withCurrentSum) =>\r\n  getAvailabilityValueForField(forRow: forRow, fieldToCheck: \"Parado\", defaultValue: 0) + withCurrentSum.downtime\r\n\r\ngetAvailabilityRunningSum = (forRow, withCurrentSum) =>\r\n  ({uptime: getRunningUptimeSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    downtime: getRunningDowntimeSum(forRow: forRow, withCurrentSum: withCurrentSum)})\r\n\r\ngetAvailability = (sumInMinForUptime, sumInMinForDowntime) =>\r\n  float(v: sumInMinForUptime) / (float(v: sumInMinForUptime) + float(v: sumInMinForDowntime))\r\n\r\nmapAvailability = (forRow) =>\r\n  ({forRow with overall_availability_per_min: 100.0 * getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime),\r\n                availability_per_min: getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime) })\r\n\r\nfrom(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"availability-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"availability\")\r\n  |> group(columns: [\"device_id\"])\r\n  |> window(every: 1m)\r\n  |> reduce(fn: (r, accumulator) => getAvailabilityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {uptime: 0, downtime: 0} )\r\n  |> map(fn: (r) => mapAvailability(forRow: r))\r\n  |> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, disponibilidad_en_min: r.overall_availability_per_min}))\r\n  |> pivot(rowKey: [\"minuto\"], columnKey: [\"dispositivo\"], valueColumn: \"disponibilidad_en_min\")",
+            "refId": "A"
+          }
+        ],
+        "title": "Disponibilidad por dispositivo",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fdksva1y07ldsc"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "#EAB839",
+                  "value": 60
+                },
+                {
+                  "color": "green",
+                  "value": 90
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 10,
+          "x": 10,
+          "y": 8
+        },
+        "id": 4,
+        "options": {
+          "minVizHeight": 75,
+          "minVizWidth": 75,
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true,
+          "sizing": "auto"
+        },
+        "pluginVersion": "10.4.2",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "fdksva1y07ldsc"
+            },
+            "query": "import \"join\"\r\n\r\ngetAvailabilityValueForField = (forRow, fieldToCheck, defaultValue) =>\r\n  if forRow._value == fieldToCheck then 1 else defaultValue\r\n\r\ngetRunningUptimeSum = (forRow, withCurrentSum) => \r\n  getAvailabilityValueForField(forRow: forRow, fieldToCheck: \"Produciendo\", defaultValue: 0) + withCurrentSum.uptime\r\n\r\ngetRunningDowntimeSum = (forRow, withCurrentSum) =>\r\n  getAvailabilityValueForField(forRow: forRow, fieldToCheck: \"Parado\", defaultValue: 0) + withCurrentSum.downtime\r\n\r\ngetAvailabilityRunningSum = (forRow, withCurrentSum) =>\r\n  ({uptime: getRunningUptimeSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    downtime: getRunningDowntimeSum(forRow: forRow, withCurrentSum: withCurrentSum)})\r\n\r\ngetAvailability = (sumInMinForUptime, sumInMinForDowntime) =>\r\n  if sumInMinForUptime == 0 then 0.0 else float(v: sumInMinForUptime) / (float(v: sumInMinForUptime) + float(v: sumInMinForDowntime))\r\n\r\nmapAvailability = (forRow) =>\r\n  ({forRow with overall_availability_per_min: 100.0 * getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime),\r\n                availability_per_min: getAvailability(sumInMinForUptime: forRow.uptime, sumInMinForDowntime: forRow.downtime) })\r\n\r\nlookupForProductName = (given_product_id) =>\r\n    if      given_product_id == \"001\" then \"Ron Viejo de Caldas\"\r\n    else if given_product_id == \"002\" then \"Aguardiente Amarillo\"\r\n    else if given_product_id == \"003\" then \"Aguardiente Tapa Azul\"\r\n    else if given_product_id == \"004\" then \"Aguardiente Nariño\"\r\n    else given_product_id\r\n\r\nmapProductName = (forRow) =>\r\n  ({forRow with product_name: lookupForProductName(given_product_id: forRow.product_id)})\r\n\r\ngetQualityValueForField = (forRow, fieldToCheck, defaultValue) =>\r\n  if forRow._field == fieldToCheck then int(v: forRow._value) else defaultValue\r\n\r\ngetRunningApproveSum = (forRow, withCurrentSum) =>\r\n  getQualityValueForField(forRow: forRow, fieldToCheck: \"approved\", defaultValue: 0) + withCurrentSum.approved\r\n\r\ngetRunningRejectSum = (forRow, withCurrentSum) =>\r\n  getQualityValueForField(forRow: forRow, fieldToCheck: \"rejected\", defaultValue: 0) + withCurrentSum.rejected\r\n\r\ngetQualityRunningSum = (forRow, withCurrentSum) =>\r\n  ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),\r\n    seconds_in_min: float(v: forRow.elapsed) + withCurrentSum.seconds_in_min\r\n  })\r\n\r\ngetAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>\r\n  if seconds_in_min == 0.0 then 0.0 else float(v: velocityPerMin) / (60.0 / seconds_in_min)\r\n\r\ngetThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>\r\n  if adjustedVelocityForRunningMinute == 0.0 then 0.0 else float(v: sumInMin) / adjustedVelocityForRunningMinute\r\n\r\nmapThroughput = (forRow) => {\r\n  adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)\r\n  return ({forRow with approved_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.approved, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                rejected_velocity_percentage_per_min: 100.0 * getThroughput(sumInMin: forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                overall_throughput_per_min: 100.0 * getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity),\r\n                throughput_per_min: getThroughput(sumInMin: forRow.approved + forRow.rejected, adjustedVelocityForRunningMinute: adjustedVelocity) })\r\n}\r\n\r\ngetQuality = (sumInMinForApproved, sumInMinForRejected) =>\r\n  if sumInMinForApproved == 0 then 0.0 else float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))\r\n\r\nmapQuality = (forRow) =>\r\n  ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),\r\n                quality_per_min: getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected) })\r\n\r\ngetEfficiencyOee = (availability, quality, throughput) =>\r\n  availability * quality * throughput\r\n\r\nmapEfficiencyOee = (forRow) =>\r\n  ({forRow with overall_efficiency_per_min: 100.0 * getEfficiencyOee(availability: forRow.availability_per_min, quality: forRow.quality_per_min, throughput: forRow.throughput_per_min),\r\n                efficiency_per_min: getEfficiencyOee(availability: forRow.availability_per_min, quality: forRow.quality_per_min, throughput: forRow.throughput_per_min) })\r\n\r\nqualityMetrics = from(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"quality-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"approved\" or r[\"_field\"] == \"rejected\")\r\n  |> group(columns: [\"device_id\", \"velocity\", \"product_id\"])\r\n  |> elapsed(unit: 1s)\r\n  |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )\r\n  |> map(fn: (r) => mapThroughput(forRow: r))\r\n  |> map(fn: (r) => mapQuality(forRow: r))\r\n  |> map(fn: (r) => mapProductName(forRow: r))\r\n  |> group(columns: [\"device_id\"])\r\n\r\navailabilityMetrics = from(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"availability-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"availability\")\r\n  |> group(columns: [\"device_id\"])\r\n  |> reduce(fn: (r, accumulator) => getAvailabilityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {uptime: 0, downtime: 0} )\r\n  |> map(fn: (r) => mapAvailability(forRow: r))\r\n  |> group(columns: [\"device_id\"])\r\n\r\njoin.left(\r\n    left: qualityMetrics,\r\n    right: availabilityMetrics,\r\n    on: (l, r) => l.device_id == r.device_id,\r\n    as: (l, r) => ({l with uptime: r.uptime, downtime: r.downtime, overall_availability_per_min: r.overall_availability_per_min, availability_per_min: r.availability_per_min})\r\n)\r\n|> map(fn: (r) => mapEfficiencyOee(forRow: r))\r\n|> pivot(rowKey: [\"product_id\"], columnKey: [\"device_id\"], valueColumn: \"overall_efficiency_per_min\")",
+            "refId": "A"
+          }
+        ],
+        "title": "OEE - Eficiencia",
+        "type": "gauge"
+      },
+      {
+        "datasource": {
+          "type": "influxdb",
+          "uid": "fdksva1y07ldsc"
+        },
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "fillOpacity": 70,
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": 1000,
+              "lineWidth": 0,
+              "spanNulls": false
+            },
+            "mappings": [
+              {
+                "options": {
+                  "Parado": {
+                    "color": "red",
+                    "index": 1
+                  },
+                  "Produciendo": {
+                    "color": "green",
+                    "index": 0
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 20,
+          "x": 0,
+          "y": 15
+        },
+        "id": 5,
+        "options": {
+          "alignValue": "center",
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "mergeValues": true,
+          "rowHeight": 0.9,
+          "showValue": "auto",
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "fdksva1y07ldsc"
+            },
+            "query": "from(bucket: \"device-metrics-db\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"availability-metric\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"availability\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"device_id\"])",
+            "refId": "A"
+          }
+        ],
+        "title": "Disponibilidad",
+        "type": "state-timeline"
+      }
+    ],
+    "refresh": "",
+    "schemaVersion": 39,
+    "tags": [],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-5m",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Eficiencia",
+    "uid": "ednwdngx37rwge",
+    "version": 21,
+    "weekStart": ""
+  }

@@ -241,13 +241,14 @@ getRunningRejectSum = (forRow, withCurrentSum) =>
 getQualityRunningSum = (forRow, withCurrentSum) =>
   ({approved: getRunningApproveSum(forRow: forRow, withCurrentSum: withCurrentSum),
     rejected: getRunningRejectSum(forRow: forRow, withCurrentSum: withCurrentSum),
-    seconds_in_min: 0.5 + withCurrentSum.seconds_in_min })
+    seconds_in_min: float(v: forRow.elapsed) + withCurrentSum.seconds_in_min
+  })
 
 getAdjustedVelocityForRunningMinute = (velocityPerMin, seconds_in_min) =>
-  float(v: velocityPerMin) / (60.0 / seconds_in_min)
+  if seconds_in_min == 0.0 then 0.0 else float(v: velocityPerMin) / (60.0 / seconds_in_min)
 
 getThroughput = (sumInMin, adjustedVelocityForRunningMinute) =>
-  float(v: sumInMin) / adjustedVelocityForRunningMinute
+  if adjustedVelocityForRunningMinute == 0.0 then 0.0 else float(v: sumInMin) / adjustedVelocityForRunningMinute
 
 mapThroughput = (forRow) => {
   adjustedVelocity = getAdjustedVelocityForRunningMinute(velocityPerMin: forRow.velocity, seconds_in_min: forRow.seconds_in_min)
@@ -258,7 +259,7 @@ mapThroughput = (forRow) => {
 }
 
 getQuality = (sumInMinForApproved, sumInMinForRejected) =>
-  float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))
+  if sumInMinForApproved == 0 then 0.0 else float(v: sumInMinForApproved) / (float(v: sumInMinForApproved) + float(v: sumInMinForRejected))
 
 mapQuality = (forRow) =>
   ({forRow with overall_quality_per_min: 100.0 * getQuality(sumInMinForApproved: forRow.approved, sumInMinForRejected: forRow.rejected),
@@ -270,6 +271,7 @@ from(bucket: "device-metrics-db")
   |> filter(fn: (r) => r["_field"] == "approved" or r["_field"] == "rejected")
   |> group(columns: ["device_id", "velocity", "product_id"])
   |> window(every: 1m)
+  |> elapsed(unit: 1s)
   |> reduce(fn: (r, accumulator) => getQualityRunningSum(forRow: r, withCurrentSum: accumulator), identity: {approved: 0, rejected: 0, seconds_in_min: 0.0} )
   |> map(fn: (r) => mapThroughput(forRow: r))
   |> map(fn: (r) => mapQuality(forRow: r))
