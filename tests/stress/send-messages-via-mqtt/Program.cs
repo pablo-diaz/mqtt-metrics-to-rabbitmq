@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace SendMessagesViaMqtt;
 
-public class Program
+public static class Program
 {
     public static async Task Main(string[] args)
     {
@@ -14,7 +14,7 @@ public class Program
 
         keyboard.AddKeyboardListener(forKey: ConsoleKey.Escape, withMessage: "Press 'Esc' key to stop running test scenarios", keyPressedHandler: _ => {
             tokenSource.Cancel();
-            var stopRunningKeyPressedEvents = true;
+            const bool stopRunningKeyPressedEvents = true;
             return stopRunningKeyPressedEvents;
         });
 
@@ -30,6 +30,7 @@ public class Program
                     },
                     MetricCountToSendPerDevice = 60,
                     StartingFromDate = DateTime.Now,
+                    ShouldItSendTimestamps = true,
                     MillisecondsToWaitWhileSendingEachMetric = 5_000,
                     AddKeyboardListener = (forKey, keyPressedHandler, withMessage) => keyboard.AddKeyboardListener(forKey: forKey, keyPressedHandler: keyPressedHandler, withMessage: withMessage),
                     RemoveKeyboardListener = key => keyboard.RemoveKeyboardListener(forKey: key)
@@ -45,6 +46,7 @@ public class Program
                     },
                     MetricCountToSendPerDevice = 240,
                     StartingFromDate = DateTime.Now,
+                    ShouldItSendTimestamps = false,
                     MillisecondsToWaitWhileSendingEachMetric = 1_000,
                     AddKeyboardListener = (forKey, keyPressedHandler, withMessage) => keyboard.AddKeyboardListener(forKey: forKey, keyPressedHandler: keyPressedHandler, withMessage: withMessage),
                     RemoveKeyboardListener = key => keyboard.RemoveKeyboardListener(forKey: key)
@@ -77,6 +79,7 @@ public class Program
                     },
                     MetricCountToSendPerDevice = 500,
                     StartingFromDate = DateTime.Now,
+                    ShouldItSendTimestamps = true,
                     MillisecondsToWaitWhileSendingEachMetric = 1_000,
                     AddKeyboardListener = (forKey, keyPressedHandler, withMessage) => keyboard.AddKeyboardListener(forKey: forKey, keyPressedHandler: keyPressedHandler, withMessage: withMessage),
                     RemoveKeyboardListener = key => keyboard.RemoveKeyboardListener(forKey: key)

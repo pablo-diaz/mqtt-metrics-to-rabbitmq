@@ -19,6 +19,7 @@
 
     "ProcessorConfig": {
         "DeviceInfoFilePath": "/var/device-metrics-processor/device-info.csv",
+        "IsTimestampSent": false,
         "MessageParts": [
             { "Name": "availability",    "Purpose": "field", "Type": "string" },
             { "Name": "stopping_reason", "Purpose": "tag",   "Type": "string" }

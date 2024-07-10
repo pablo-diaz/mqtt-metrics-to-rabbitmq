@@ -12,4 +12,5 @@ public class ProcessorConfig
 
     public string DeviceInfoFilePath { get; set; }
     public Part[] MessageParts { get; set; }
+    public bool IsTimestampSent { get; set; } = true;
 }

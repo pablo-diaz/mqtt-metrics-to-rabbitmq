@@ -19,6 +19,7 @@ public sealed class Scenario
     public Device[] Devices { get; init; }
     public int MetricCountToSendPerDevice { get; init; }
     public DateTime StartingFromDate { get; init; }
+    public bool ShouldItSendTimestamps { get; init; }
     public int MillisecondsToWaitWhileSendingEachMetric { get; init; }
 
     public AddKeyboardListenerFn AddKeyboardListener { get; init; }
@@ -49,7 +50,7 @@ public sealed class Scenario
         var bindingContext = BindKeyToDeviceId(forDeviceId, usingRandomizer);
         AddKeyboardListener(forKey: bindingContext.forKey, keyPressedHandler: bindingContext.keyPressedHandler, withMessage: bindingContext.withMessage);
 
-        foreach(var metrics in Devices[forDeviceId - 1].GetMetrics(forDeviceId, StartingFromDate).Take(MetricCountToSendPerDevice))
+        foreach(var metrics in Devices[forDeviceId - 1].GetMetrics(forDeviceId, ShouldItSendTimestamps, StartingFromDate).Take(MetricCountToSendPerDevice))
         {
             if(token.IsCancellationRequested)
                 break;

@@ -19,6 +19,7 @@
 
     "ProcessorConfig": {
         "DeviceInfoFilePath": "/var/device-metrics-processor/device-info.csv",
+        "IsTimestampSent": false,
         "MessageParts": [
             { "Name": "velocity",   "Purpose": "tag",   "Type": "number" },
             { "Name": "product_id", "Purpose": "tag",   "Type": "string" },

@@ -48,22 +48,22 @@ public sealed class Device
         _currentRejectedCount = 0;
     }
 
-    public IEnumerable<(string AvailabilityMetric, string QualityMetric)> GetMetrics(int forDeviceId, DateTime startingFromDate)
+    public IEnumerable<(string AvailabilityMetric, string QualityMetric)> GetMetrics(int forDeviceId, bool shouldItSendTimestamps, DateTime startingFromDate)
     {
         var aDate = startingFromDate;
 
         while(true)
         {
             var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 3, paddingChar: '0');
-            (var availability, var downtimeReason) = GetAvailabilityMetrics();
-            (var approved, var rejected) = GetQualityMetrics();
-            var dateToSend = $"{aDate:yyyy-M-d@H_m_s}";
+            var(availability, downtimeReason) = GetAvailabilityMetrics();
+            var (approved, rejected) = GetQualityMetrics();
+            var dateToSend = shouldItSendTimestamps ? $"@{aDate:yyyy-M-d@H_m_s}" : "";
             
             aDate = aDate.AddSeconds(1);
             ResetRejectedCount();
 
-            yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}@{dateToSend:yyyy-M-d@H_m_s}",
-                          QualityMetric:      $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}@{dateToSend:yyyy-M-d@H_m_s}");
+            yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}{dateToSend}",
+                          QualityMetric:      $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}{dateToSend}");
         }
     }
 
