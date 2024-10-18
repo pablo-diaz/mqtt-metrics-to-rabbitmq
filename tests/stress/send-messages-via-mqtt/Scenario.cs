@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 
 namespace SendMessagesViaMqtt;
 
@@ -21,6 +20,8 @@ public sealed class Scenario
     public DateTime StartingFromDate { get; init; }
     public bool ShouldItSendTimestamps { get; init; }
     public int MillisecondsToWaitWhileSendingEachMetric { get; init; }
+    public bool ShouldBeVerbose { get; init; }
+    public string TargetMqttServer { get; init; }
 
     public AddKeyboardListenerFn AddKeyboardListener { get; init; }
     public RemoveKeyboardListenerFn RemoveKeyboardListener { get; init; }
@@ -30,9 +31,10 @@ public sealed class Scenario
         try
         {
             Console.WriteLine($"\n------ Running Availability scenario '{Name}' ---------");
+            PrintScenarioDescription();
 
             await using var broker = new Broker();
-            await broker.ConnectAsync(ClientId, token);
+            await broker.ConnectAsync(withClientId: ClientId, toServer: TargetMqttServer, token);
 
             await Task.WhenAll(Enumerable.Range(start: 1, count: Devices.Count())
                                          .Select(deviceId => SendMetricsAsync(deviceId, broker, usingRandomizer, token))
@@ -43,6 +45,21 @@ public sealed class Scenario
             Console.WriteLine($"General exception caught. Reason: {ex.Message}");
             Console.WriteLine(ex.StackTrace);
         }
+    }
+
+    private void PrintScenarioDescription()
+    {
+        Console.WriteLine("\tDevice\tToggle Availability with Known reason\tToggle Availability with UnKnown reason\tReduce Quality");
+        Console.WriteLine("\t------\t-------------------------------------\t---------------------------------------\t--------------");
+
+        var currentDeviceId = 1;
+        foreach (var device in Devices)
+        {
+            Console.WriteLine($"\t{Device.GetName(forDeviceId: currentDeviceId)}\t\t\t{device.KeyToBind}\t\t\t\t\tCtrl+{device.KeyToBind}\t\t\tShift+{device.KeyToBind}");
+            currentDeviceId++;
+        }
+
+        Console.WriteLine($"\n**************************************************");
     }
 
     private async Task SendMetricsAsync(int forDeviceId, Broker withBroker, Random usingRandomizer, CancellationToken token)
@@ -56,10 +73,12 @@ public sealed class Scenario
                 break;
 
             await withBroker.SendMessageAsync(targetBrokerTopic: _AvailabilityMqttTopicName, message: metrics.AvailabilityMetric, token: token);
-            Console.WriteLine($"MQTT message published to '{_AvailabilityMqttTopicName}' topic with payload: '{metrics.AvailabilityMetric}'");
+            if(ShouldBeVerbose) Console.WriteLine($"MQTT message published to '{_AvailabilityMqttTopicName}' topic with payload: '{metrics.AvailabilityMetric}'");
 
             await withBroker.SendMessageAsync(targetBrokerTopic: _QualityMqttTopicName, message: metrics.QualityMetric, token: token);
-            Console.WriteLine($"MQTT message published to '{_QualityMqttTopicName}' topic with payload: '{metrics.QualityMetric}'");
+            if (ShouldBeVerbose) Console.WriteLine($"MQTT message published to '{_QualityMqttTopicName}' topic with payload: '{metrics.QualityMetric}'");
+
+            if (ShouldBeVerbose == false) Console.Write(".");
 
             await Task.Delay(millisecondsDelay: MillisecondsToWaitWhileSendingEachMetric);
         }
@@ -82,6 +101,6 @@ public sealed class Scenario
                 var stopRunningKeyPressedEvents = false;
                 return stopRunningKeyPressedEvents;
             },
-            withMessage: $"Press '{Devices[forDeviceId - 1].KeyToBind}' key to toggle availability for Device Id '{forDeviceId}'"
+            withMessage: null
         );
 }

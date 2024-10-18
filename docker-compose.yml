@@ -62,7 +62,7 @@ services:
   
   stopreasonsserver:
     container_name: stop_reasons_container
-    image: "stop-reasons:jaime-c8.0-003"
+    image: "stop-reasons:jaime-c8.0-001"
     env_file:
       - ./config/docker/StopReasons/docker-env-vars
     ports:

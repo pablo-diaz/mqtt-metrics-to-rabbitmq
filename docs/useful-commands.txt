@@ -19,6 +19,10 @@ docker run -d --name myinfluxdb -p 8086:8086 -v $(pwd)/volumes/influx-data:/var/
 docker run -d --name myinfluxdb -p 8086:8086 -e DOCKER_INFLUXDB_INIT_MODE=setup -e DOCKER_INFLUXDB_INIT_USERNAME=guest -e DOCKER_INFLUXDB_INIT_PASSWORD=prueba2024 -e DOCKER_INFLUXDB_INIT_ORG=personal -e DOCKER_INFLUXDB_INIT_BUCKET=device-metrics-db -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN="EIKFDKIF1R4zs0KrvYpJPVoYiFJ4pJfvSuEjkvOf_kgDHOTuBml5R2TJXem3zEjQkJLZZ5BPYTO-clj2-e6pgQ==" -e DOCKER_INFLUXDB_INIT_RETENTION=1w influxdb:2.7.4
 docker run -d --name myinfluxdb -v $(pwd)/volumes/myInfluxVolume:/var/lib/influxdb2 -p 8086:8086 influxdb:2.7.4
 
+influx backup --bucket device-metrics-db /var/backups
+
+influx restore --bucket device-metrics-db --new-bucket restored-device-metrics-db /var/backups/influx-backups
+
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # docker pull grafana/grafana:10.4.2
@@ -60,3 +64,9 @@ docker run -d --name=quality-metrics-consumer -v $(pwd)/config/docker/BrokerCons
 docker build -t stop-reasons:jaime-c8.0-001 -f config/docker/StopReasons/dockerfile .
 
 docker run -d --name=stop-reasons --env-file config/docker/StopReasons/docker-env-vars stop-reasons:jaime-c8.0-001
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+docker build -t testing-tool:jaime-c8.0-001 -f config/docker/TestingTool/dockerfile .
+
+docker run -it --rm testing-tool:jaime-c8.0-001 --dev-count 2 --met-per-dev 5 --verbose true --velocity-per-min 600 --prod-id 002 --mqtt-server host.docker.internal

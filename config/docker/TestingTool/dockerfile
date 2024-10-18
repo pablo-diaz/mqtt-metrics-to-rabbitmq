@@ -1,0 +1,12 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 as build-env
+WORKDIR /src
+COPY tests/stress/send-messages-via-mqtt/ .
+RUN dotnet publish -c Release -o /publish /src/send-messages-via-mqtt.csproj
+
+FROM mcr.microsoft.com/dotnet/runtime:8.0 as runtime
+RUN apt install tzdata
+ENV TZ=America/Bogota
+RUN cp /usr/share/zoneinfo/America/Bogota /etc/localtime && echo "America/Bogota" > /etc/timezone
+WORKDIR /publish
+COPY --from=build-env /publish .
+ENTRYPOINT ["dotnet", "send-messages-via-mqtt.dll"]

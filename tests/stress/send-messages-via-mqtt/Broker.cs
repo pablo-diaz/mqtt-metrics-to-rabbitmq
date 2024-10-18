@@ -12,13 +12,13 @@ public sealed class Broker: IAsyncDisposable
 {
     private IMqttClient _client;
 
-    public Task ConnectAsync(string clientId, CancellationToken token)
+    public Task ConnectAsync(string withClientId, string toServer, CancellationToken token)
     {
         var mqttFactory = new MqttFactory();
         _client = mqttFactory.CreateMqttClient();
         var mqttClientOptions = new MqttClientOptionsBuilder()
-            .WithClientId(clientId)
-            .WithTcpServer(server: "localhost")
+            .WithClientId(withClientId)
+            .WithTcpServer(server: toServer)
             .WithCredentials(username: "mqtt-enabled-user", password: "prueba2024")
             .Build();
 

@@ -48,14 +48,16 @@ public sealed class Device
         _currentRejectedCount = 0;
     }
 
+    public static string GetName(int forDeviceId) => "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 3, paddingChar: '0');
+
     public IEnumerable<(string AvailabilityMetric, string QualityMetric)> GetMetrics(int forDeviceId, bool shouldItSendTimestamps, DateTime startingFromDate)
     {
         var aDate = startingFromDate;
 
         while(true)
         {
-            var deviceId = "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 3, paddingChar: '0');
-            var(availability, downtimeReason) = GetAvailabilityMetrics();
+            var deviceId = GetName(forDeviceId);
+            var (availability, downtimeReason) = GetAvailabilityMetrics();
             var (approved, rejected) = GetQualityMetrics();
             var dateToSend = shouldItSendTimestamps ? $"@{aDate:yyyy-M-d@H_m_s}" : "";
             
