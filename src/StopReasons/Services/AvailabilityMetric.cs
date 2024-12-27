@@ -17,7 +17,7 @@ public class AvailabilityMetric
     public DateTime TracedAt { get; }
     public Maybe<string> MaybeDowntimeReason { get; }
 
-    private static readonly string _notSetReason = "-";
+    private static readonly string _StopReasonHasNotBeenSetYet = "-";
 
     private AvailabilityMetric(string deviceId, AvailabilityType type, DateTime tracedAt, Maybe<string> maybeDowntimeReason)
     {
@@ -30,12 +30,8 @@ public class AvailabilityMetric
     public static Result<AvailabilityMetric> From(string message, (string workingStateLabel, string stoppedStateLabel) withAllowedStates)
     {
         var messageParts = message.Split('@');
-        if(messageParts.Length != 5)
-            return Result.Failure<AvailabilityMetric>($"{messageParts.Length} parts were found but 5 parts were expected");
-
-        var tracedAtResult = GetDate(fromDate: messageParts[^2], fromTime: messageParts[^1]);
-        if(tracedAtResult.IsFailure)
-            return Result.Failure<AvailabilityMetric>(tracedAtResult.Error);
+        if(messageParts.Length < 3)
+            return Result.Failure<AvailabilityMetric>($"At least 3 parts were expected (DeviceId, State and Maybe stopping reason) but {messageParts.Length} parts were found");
 
         var parsedTypeResult = ParseAvailabilityType(from: messageParts[1], withAllowedStates: withAllowedStates);
         if(parsedTypeResult.IsFailure)
@@ -45,20 +41,7 @@ public class AvailabilityMetric
         if(maybeDowntimeReasonResult.IsFailure)
             return Result.Failure<AvailabilityMetric>(maybeDowntimeReasonResult.Error);
 
-        return new AvailabilityMetric(deviceId: messageParts[0], type: parsedTypeResult.Value, tracedAt: tracedAtResult.Value, maybeDowntimeReason: maybeDowntimeReasonResult.Value);
-    }
-
-    private static Result<DateTime> GetDate(string fromDate, string fromTime)
-    {
-        var dateParts = fromDate.Split('-');
-        if(dateParts.Length != 3)
-            return Result.Failure<DateTime>($"Date part has {dateParts.Length} parts but 3 parts were expected");
-
-        var timeParts = fromTime.Split('_');
-        if(timeParts.Length != 3)
-            return Result.Failure<DateTime>($"Time part has {timeParts.Length} parts but 3 parts were expected");
-
-        return new DateTime(int.Parse(dateParts[0]), int.Parse(dateParts[1]), int.Parse(dateParts[2]), int.Parse(timeParts[0]), int.Parse(timeParts[1]), int.Parse(timeParts[2]));
+        return new AvailabilityMetric(deviceId: messageParts[0], type: parsedTypeResult.Value, tracedAt: DateTime.Now, maybeDowntimeReason: maybeDowntimeReasonResult.Value);
     }
 
     private static Result<AvailabilityType> ParseAvailabilityType(string from, (string workingStateLabel, string stoppedStateLabel) withAllowedStates)
@@ -70,7 +53,7 @@ public class AvailabilityMetric
 
     private static Result<Maybe<string>> GetDowntimeReason(string from, AvailabilityType givenAvailability) => givenAvailability switch {
         AvailabilityType.WORKING => Maybe<string>.None,
-        AvailabilityType.STOPPED => from == _notSetReason ? Maybe<string>.None : Maybe<string>.From(from),
+        AvailabilityType.STOPPED => from == _StopReasonHasNotBeenSetYet ? Maybe<string>.None : Maybe<string>.From(from),
         _ => Result.Failure<Maybe<string>>($"UnExcepted availability type '{givenAvailability}'")
     };
 

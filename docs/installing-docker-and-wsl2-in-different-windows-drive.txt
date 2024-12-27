@@ -1,0 +1,39 @@
+https://dev.to/mefaba/installing-wsl-on-another-drive-in-windows-5c4a
+
+wsl --update
+wsl --list -v
+wsl --list --online
+wsl --install Ubuntu-24.04
+
+- to stop de executing image:  wsl -t Ubuntu
+- export it: wsl --export Ubuntu-24.04 "E:\wsl_export\ubuntu-ex.tar"
+- un-register: wsl --unregister Ubuntu-24.04
+- re-register: wsl --import Ubuntu-24.04 "E:\wsl_import\ubuntu" "E:\wsl_export\ubuntu-ex.tar" 
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+https://docs.docker.com/desktop/release-notes/#4290
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+
+https://stackoverflow.com/questions/75727062/how-to-install-docker-desktop-on-a-different-drive-location-on-windows
+
+Windows Terminal as administrator
+
+Go to the folder where "Docker Desktop Installer.exe" downloaded.
+Run
+
+start /w "" '.\Docker Desktop Installer.exe' install -accept-license --installation-dir="E:\Docker\Docker" --wsl-default-data-root="E:\Docker\images" --windows-containers-default-data-root="E:\\Docker"
+
+
+
+I had this error: "Unexpected token 'install' in expression or statement".
+For solving, I wrote '.\Docker Desktop Installer.exe' and the rest of the commands.
+Simple quotes and problem solved! 
+
+
+------------------------------------------
+
+https://askubuntu.com/questions/1264102/wsl-2-wont-run-ubuntu-error-0x80370102
+
