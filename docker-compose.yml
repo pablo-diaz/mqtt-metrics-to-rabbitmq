@@ -15,6 +15,7 @@ services:
       retries: 5
     ports:
       - "1883:1883"
+      - "8080:15672"
     networks:
       - backend_space
 
@@ -27,6 +28,12 @@ services:
       - "8086:8086"
     networks:
       - backend_space
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8086/ping"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   chartingserver:
     container_name: charting_container
@@ -37,7 +44,7 @@ services:
       - "80:3000"
     depends_on:
       timeseriesserver:
-        condition: service_started
+        condition: service_healthy
     networks:
       - backend_space
   
@@ -86,12 +93,12 @@ services:
       brokerserver:
         condition: service_healthy
       timeseriesserver:
-        condition: service_started
+        condition: service_healthy
     networks:
       - backend_space
 
   quality_connector:
-    image: "broker-consumer:jaime-c8.0-001"
+    image: "pabloandresd/broker-consumer:002"
     volumes:
       - ./config/docker/BrokerConsumer/quality-settings.json:/publish/appsettings.json:ro
       - ./docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro
@@ -99,7 +106,7 @@ services:
       brokerserver:
         condition: service_healthy
       timeseriesserver:
-        condition: service_started
+        condition: service_healthy
     networks:
       - backend_space
 

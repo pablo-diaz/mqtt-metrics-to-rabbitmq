@@ -1,0 +1,27 @@
+option task = {name: "downsample_availability_linea1_1m_precision_no_devices", every: 5m, offset: 5s}
+	
+contarProduciendoEnPeriodo = (renglon, cuentaAcumulada) => {
+  estaProduciendo = renglon._value == "Produciendo"
+  nuevoAlgunoProdujoEnPeriodo = cuentaAcumulada.algunoProdujoEnPeriodo or estaProduciendo
+  esNuevoTime = cuentaAcumulada.ultimoTime != renglon._time
+  nuevoTotalSecs = if esNuevoTime then cuentaAcumulada.totalSecs + 1 else cuentaAcumulada.totalSecs
+
+  return ({algunoProdujoEnPeriodo: nuevoAlgunoProdujoEnPeriodo, totalSecs: nuevoTotalSecs, ultimoTime: renglon._time})
+}
+
+from(bucket: "device-metrics-db")
+  |> range(start: 2025-01-15T12:55:00Z, stop: 2025-01-15T13:00:00Z)
+  //|> range(start: -5m)
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> filter(fn: (r) => r["linea"] == "linea01")
+  |> keep(columns: ["_value", "_time"])
+  |> truncateTimeColumn(unit: 1s)
+  |> window(every: 1m)
+  |> sort(columns: ["_time"])
+  |> reduce(fn: (r, accumulator) => contarProduciendoEnPeriodo(renglon: r, cuentaAcumulada: accumulator),
+      identity: {algunoProdujoEnPeriodo: false, totalSecs: 0, ultimoTime: time(v: "2024-01-01T00:00:01.000Z")} )
+  |> group()
+  |> map(fn: (r) => ({ _time: r._start, _measurement: "lineas", _field: "linea", _value: "linea01", algunoProdujoEnPeriodo: string(v: r.algunoProdujoEnPeriodo), totalSecs: string(v: r.totalSecs)}))
+  //|> to(bucket: "availability-1m-precision-no-devices", org: "personal", fieldFn: (r) => ({"algunoProdujoEnPeriodo": r.algunoProdujoEnPeriodo, "totalSecs": r.totalSecs}))
+  |> to(bucket: "availability-1m-precision-no-devices", org: "personal")

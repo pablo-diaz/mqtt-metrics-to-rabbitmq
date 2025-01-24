@@ -50,7 +50,8 @@ public sealed class Device
 
     public static string GetName(int forDeviceId) => "Dev" + forDeviceId.ToString().PadLeft(totalWidth: 3, paddingChar: '0');
 
-    public IEnumerable<(string AvailabilityMetric, string QualityMetric)> GetMetrics(int forDeviceId, bool shouldItSendTimestamps, DateTime startingFromDate)
+    public IEnumerable<(string AvailabilityMetric, string QualityMetric)> GetMetrics(int forDeviceId, bool shouldItSendTimestamps,
+        DateTime startingFromDate, Random usingRandomizer, bool shouldItRandomlyProduceFailingQualityMessages)
     {
         var aDate = startingFromDate;
 
@@ -64,10 +65,19 @@ public sealed class Device
             aDate = aDate.AddSeconds(1);
             ResetRejectedCount();
 
+            var qualityMetricMessage = $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}{dateToSend}";
+            if (shouldItRandomlyProduceFailingQualityMessages)
+                qualityMetricMessage = MaybeAdjustMetricMessageSoItRandomlyFails(usingRandomizer, usingMessageThatWorks: qualityMetricMessage);
+
             yield return (AvailabilityMetric: $"{deviceId}@{availability}@{downtimeReason}{dateToSend}",
-                          QualityMetric:      $"{deviceId}@{Velocity}@{WorkingForProductId}@Aprobados@{approved}@Rechazados@{rejected}{dateToSend}");
+                          QualityMetric: qualityMetricMessage);
         }
     }
+
+    private static string MaybeAdjustMetricMessageSoItRandomlyFails(Random usingRandomizer, string usingMessageThatWorks) =>
+        usingRandomizer.Next(minValue: 0, maxValue: 100) % 30 > 0
+        ? usingMessageThatWorks
+        : "message_without_ats";  // this message won't meet standards, so it should fail in the consuming end, when it gets validated
 
     private (string Availability, string DowntimeReason) GetAvailabilityMetrics() =>
         (Availability:   _isItAvailableNow ? "Produciendo" : "Parado",

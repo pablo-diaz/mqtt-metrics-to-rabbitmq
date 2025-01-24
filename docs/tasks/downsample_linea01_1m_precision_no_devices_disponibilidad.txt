@@ -1,0 +1,43 @@
+option task = {
+    name: "downsample_linea01_1m_precision_no_devices_disponibilidad",
+    every: 5m,
+    offset: 5s,
+}
+
+calcularTotalProduciendoEnSegundo = (renglon, memoria) => ({
+    sumaBitsProduciendo: memoria.sumaBitsProduciendo + renglon.bitEstaProduciendo
+})
+
+calcularSegundosProduciendoEnPeriodo = (renglon, memoria) => ({
+    totalSecsGeneral:       memoria.totalSecsGeneral        + renglon.totalSecs,
+    totalSecsProduciendo:   memoria.totalSecsProduciendo    + renglon.estaProduciendo
+})
+
+from(bucket: "device-metrics-db")
+  |> range(start: -5m)
+  |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+  |> filter(fn: (r) => r["_field"] == "availability")
+  |> filter(fn: (r) => r["linea"] == "linea01")
+  |> truncateTimeColumn(unit: 1s)
+  |> keep(columns: ["_value", "_time"])
+  |> map(fn: (r) => ({r with bitEstaProduciendo: if r._value == "Produciendo" then 1 else 0 }))
+  |> group(columns: ["_time"])
+  |> reduce(fn: (r, accumulator) => calcularTotalProduciendoEnSegundo(renglon: r, memoria: accumulator),
+            identity: {sumaBitsProduciendo: 0} )
+  |> map(fn: (r) => ({r with estaProduciendo: if r.sumaBitsProduciendo > 0 then 1 else 0, totalSecs: 1 }))
+  |> group()
+  |> window(every: 1m)
+  |> reduce(fn: (r, accumulator) => calcularSegundosProduciendoEnPeriodo(renglon: r, memoria: accumulator),
+            identity: {totalSecsGeneral: 0, totalSecsProduciendo: 0} )
+  |> map(
+        fn: (r) =>
+            ({
+                _time: r._start,
+                _measurement: "lineas",
+                _field: "linea",
+                _value: "linea01",
+                totalSecsGeneral: string(v: r.totalSecsGeneral),
+                totalSecsProduciendo: string(v: r.totalSecsProduciendo),
+            }),
+    )
+    |> to(bucket: "linea01_1m_precision_no_devices_disponibilidad", org: "personal")

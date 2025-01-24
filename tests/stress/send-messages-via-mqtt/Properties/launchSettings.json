@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "send-messages-via-mqtt": {
+      "commandName": "Project",
+      "commandLineArgs": "--dev-count 20 --met-per-dev 14400 --verbose false --velocity-per-min 600 --prod-id 002 --with-random-failing-quality-messages false"
+    }
+  }
+}

@@ -63,9 +63,19 @@ docker build -t broker-consumer:jaime-c8.0-001 -f config/docker/BrokerConsumer/d
 docker run -d --name=availability-metrics-consumer -v $(pwd)/config/docker/BrokerConsumer/availability-settings.json:/publish/appsettings.json:ro -v $(pwd)/docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro broker-consumer:jaime-c8.0-001
 docker run -d --name=quality-metrics-consumer -v $(pwd)/config/docker/BrokerConsumer/quality-settings.json:/publish/appsettings.json:ro -v $(pwd)/docs/example-of-device-info-file.csv:/var/device-metrics-processor/device-info.csv:ro broker-consumer:jaime-c8.0-001
 
+docker build -t pabloandresd/broker-consumer:002 -f config/docker/BrokerConsumer/dockerfile .
+docker push pabloandresd/broker-consumer:002
+docker pull pabloandresd/broker-consumer:002
+
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 docker build -t stop-reasons:jaime-c8.0-001 -f config/docker/StopReasons/dockerfile .
+
+docker build -t pabloandresd/stopping-reasons-webapp:002 -f config/docker/StopReasons/dockerfile .
+docker push pabloandresd/stopping-reasons-webapp:002
+docker pull pabloandresd/stopping-reasons-webapp:002
+
+docker logs -n 30 -t f4debb9db6cc
 
 docker run -d --name=stop-reasons --env-file config/docker/StopReasons/docker-env-vars stop-reasons:jaime-c8.0-001
 
@@ -75,4 +85,8 @@ docker build -t testing-tool:jaime-c8.0-001 -f config/docker/TestingTool/dockerf
 
 docker run -it --rm testing-tool:jaime-c8.0-001 --verbose true --mqtt-server host.docker.internal
 
-docker run -it --rm testing-tool:jaime-c8.0-001 --dev-count 2 --met-per-dev 5 --verbose true --velocity-per-min 600 --prod-id 002 --mqtt-server host.docker.internal
+docker run -it --rm testing-tool:jaime-c8.0-001 --dev-count 2 --met-per-dev 5 --verbose true --velocity-per-min 600 --prod-id 002 --mqtt-server host.docker.internal --with-random-failing-quality-messages false
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+docker ps --format "[{{.State}}] {{.ID}} {{.Names}}"

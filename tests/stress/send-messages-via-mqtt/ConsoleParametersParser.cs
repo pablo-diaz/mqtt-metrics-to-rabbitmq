@@ -7,7 +7,7 @@ namespace SendMessagesViaMqtt;
 internal static class ConsoleParametersParser
 {
     public record struct ParametersForSpecificScenario(int DeviceCount, int NumberOfMetricsPerDevice, bool ShouldBeVerbose, int VelocityPerMinuteForEachDevice,
-        string WorkingForProductId, string TargetMqttServer);
+        string WorkingForProductId, string TargetMqttServer, bool ShouldItRandomlySendFailingQualityMessages);
     private record Parameter(string Name, string Value);
 
     private class ParameterNames
@@ -18,6 +18,7 @@ internal static class ConsoleParametersParser
         public const string ForVelocityPerMinuteForEachDevice = "--velocity-per-min";
         public const string ForWorkingForProductId = "--prod-id";
         public const string ForTargetMqttServer = "--mqtt-server";
+        public const string ForShouldItRandomlySendFailingQualityMessages = "--with-random-failing-quality-messages";
     }
 
     private class DefaultValues
@@ -28,6 +29,7 @@ internal static class ConsoleParametersParser
         public const int ForVelocityPerMinuteForEachDevice = 600;
         public const string ForWorkingForProductId = "--002";
         public const string ForTargetMqttServer = "localhost";
+        public const bool ForShouldItRandomlySendFailingQualityMessages = false;
     }
 
     public static ParametersForSpecificScenario? GetParametersForSpecificScenario(string[] fromConsoleArguments)
@@ -60,18 +62,20 @@ internal static class ConsoleParametersParser
         if (paramName == ParameterNames.ForVelocityPerMinuteForEachDevice) return true;
         if (paramName == ParameterNames.ForWorkingForProductId) return true;
         if (paramName == ParameterNames.ForTargetMqttServer) return true;
+        if (paramName == ParameterNames.ForShouldItRandomlySendFailingQualityMessages) return true;
 
         return false;
     }
 
     private static ParametersForSpecificScenario Map(IEnumerable<Parameter> expectedParamsParsed) =>
         new ParametersForSpecificScenario(
-            DeviceCount:                    expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForDeviceCount).TryParseInt() ??                      DefaultValues.ForDeviceCount,
-            NumberOfMetricsPerDevice:       expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForNumberOfMetricsPerDevice).TryParseInt() ??         DefaultValues.ForNumberOfMetricsPerDevice,
-            ShouldBeVerbose:                expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForShouldBeVerbose).TryParseBoolean() ??              DefaultValues.ForShouldBeVerbose,
-            VelocityPerMinuteForEachDevice: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForVelocityPerMinuteForEachDevice).TryParseInt() ??   DefaultValues.ForVelocityPerMinuteForEachDevice,
-            WorkingForProductId:            expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForWorkingForProductId).TryGetString() ??             DefaultValues.ForWorkingForProductId,
-            TargetMqttServer:               expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForTargetMqttServer).TryGetString() ??                DefaultValues.ForTargetMqttServer
+            DeviceCount: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForDeviceCount).TryParseInt() ?? DefaultValues.ForDeviceCount,
+            NumberOfMetricsPerDevice: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForNumberOfMetricsPerDevice).TryParseInt() ?? DefaultValues.ForNumberOfMetricsPerDevice,
+            ShouldBeVerbose: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForShouldBeVerbose).TryParseBoolean() ?? DefaultValues.ForShouldBeVerbose,
+            VelocityPerMinuteForEachDevice: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForVelocityPerMinuteForEachDevice).TryParseInt() ?? DefaultValues.ForVelocityPerMinuteForEachDevice,
+            WorkingForProductId: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForWorkingForProductId).TryGetString() ?? DefaultValues.ForWorkingForProductId,
+            TargetMqttServer: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForTargetMqttServer).TryGetString() ?? DefaultValues.ForTargetMqttServer,
+            ShouldItRandomlySendFailingQualityMessages: expectedParamsParsed.FirstOrDefault(p => p.Name == ParameterNames.ForShouldItRandomlySendFailingQualityMessages).TryParseBoolean() ?? DefaultValues.ForShouldItRandomlySendFailingQualityMessages
         );
 
     private static int? TryParseInt(this Parameter fromParameter)

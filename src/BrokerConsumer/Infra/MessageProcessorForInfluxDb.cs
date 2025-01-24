@@ -41,7 +41,7 @@ public sealed class MessageProcessorForInfluxDb: IMessageProcessor
         var parsedMessageResult = ParseMessage(brokerMessage: message, withMessageFormat: _processorConfig);
         if(parsedMessageResult.IsFailure)
         {
-            Console.WriteLine($"Broker message does not comply with expected format. Reason: {parsedMessageResult.Error}. Message: {message}");
+            Console.Error.WriteLine($"Broker message does not comply with expected format. Reason: {parsedMessageResult.Error}. Message: {message}");
             return Task.CompletedTask;
         }
 
