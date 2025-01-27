@@ -43,17 +43,34 @@ public sealed class RabbitMqMessageReceiver : IMessageReceiver
         consumer.Received += async (_, queueMessage) => {
             try
             {
+                _channel.BasicAck(deliveryTag: queueMessage.DeliveryTag, multiple: false);
                 await messageHandlerAsyncFn(System.Text.Encoding.UTF8.GetString(queueMessage.Body.ToArray()));
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                System.Console.WriteLine($"General exception caught while processing broker message. Reason: {ex.Message}");
+                Console.Error.WriteLine($"General exception caught while processing broker message. Reason: {ex.Message}");
                 throw;
             }
 
-            _channel.BasicAck(deliveryTag: queueMessage.DeliveryTag, multiple: false);
         };
+
+        consumer.Registered += (_, information) => {
+            Console.WriteLine("[Message from RabbitMQ] Registered message receibed");
+            return Task.CompletedTask;
+        };
+
+        consumer.Shutdown += (_, information) => {
+            Console.WriteLine("[Message from RabbitMQ] Shutdown message receibed");
+            return Task.CompletedTask;
+        };
+
+        consumer.Unregistered += (_, information) => {
+            Console.WriteLine("[Message from RabbitMQ] Unregistered message receibed");
+            return Task.CompletedTask;
+        };
+
         _channel.BasicConsume(queue: _config.AvailabilityMetricsConfig.Queue, autoAck: false, consumer: consumer);
+
         return Task.CompletedTask;
     }
 }
