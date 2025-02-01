@@ -69,7 +69,7 @@ services:
   
   stopreasonsserver:
     container_name: stop_reasons_container
-    image: "pabloandresd/stopping-reasons-webapp:003"
+    image: "pabloandresd/stopping-reasons-webapp:004"
     env_file:
       - ./config/docker/StopReasons/docker-env-vars
     ports:

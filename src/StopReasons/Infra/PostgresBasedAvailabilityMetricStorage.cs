@@ -73,13 +73,18 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
         return _connection.ExecuteAsync(commandText, queryArguments);
     }
     
-    public async Task<List<IAvailabilityMetricStorage.AvailabilityMetricInStorage>> Load()
+    public async Task<List<IAvailabilityMetricStorage.AvailabilityMetricInStorage>> Load(DateTime from)
     {
         var commandText = @"SELECT id, device_id, initially_stopped_at, last_stopped_metric_traced_at, maybe_stopping_reason
                             FROM device_downtime_reason
+                            WHERE (
+                                    @pFromDate BETWEEN initially_stopped_at AND last_stopped_metric_traced_at
+                                OR
+                                    @pFromDate < initially_stopped_at
+                                )
                             ORDER BY id";
 
-        return (await _connection.QueryAsync<DbDto>(commandText))
+        return (await _connection.QueryAsync<DbDto>(commandText, param: new { pFromDate = from }))
                .Select(r => r.Map())
                .ToList();
     }

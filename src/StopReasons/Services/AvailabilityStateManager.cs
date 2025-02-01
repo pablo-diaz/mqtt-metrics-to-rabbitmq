@@ -16,11 +16,15 @@ public class AvailabilityStateManager: IDisposable
     private long _currentIdUsedForDowntimePeriods = 0;
     private readonly Func<long> _idGeneratorForDowntimePeriods;
 
+    private const int _hack_hoursInBogota = -5;
+
+    public sealed record PeriodToReport(DateTimeOffset From, DateTimeOffset To);
+
     public AvailabilityStateManager(AvailabilityStateManagerConfig config, IAvailabilityMetricStorage persistence)
     {
         this._config = config;
         this._persistence = persistence;
-        this.LoadMetricsFromPersistence();
+        this.LoadPreExistingReasonsFromPersistence(fromDate: GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(config.SinceWhenToLoadPreExistingReasonsFromPersistence));
         this._idGeneratorForDowntimePeriods = () => {
             _currentIdUsedForDowntimePeriods++;
             return _currentIdUsedForDowntimePeriods;
@@ -61,10 +65,13 @@ public class AvailabilityStateManager: IDisposable
         _stopsPerDevice.Select(kv => (devId: kv.Key, pendings: kv.Value.GetPendingDowntimePeriodsToSetReasonsFor()))
                        .SelectMany(t => t.pendings, (t, p) => p with { deviceId = t.devId });
 
-    public IEnumerable<DowntimePeriodWithReasonSet> GetMostRecentDowntimePeriods() =>
-        _stopsPerDevice.Select(kv => (devId: kv.Key, periods: kv.Value.GetPeriodsWithReasonSet()))
+    public IEnumerable<DowntimePeriodWithReasonSet> GetMostRecentDowntimeReasons(PeriodToReport inPeriod) =>
+        _stopsPerDevice.Select(kv => (devId: kv.Key, periods: kv.Value.GetPeriodsWithReasonSet(from: GetLocalTime(inPeriod.From), to: GetLocalTime(inPeriod.To))))
                        .SelectMany(t => t.periods, (t, p) => p with { deviceId = t.devId });
-    
+
+    private static DateTime GetLocalTime(DateTimeOffset from) =>
+        from.DateTime.AddHours(_hack_hoursInBogota);  // TODO: I'm being lazy and I will find a better way soon
+
     private async Task<Result> Process(AvailabilityMetric metric)
     {
         if(_stopsPerDevice.ContainsKey(metric.DeviceId) == false)
@@ -109,9 +116,23 @@ public class AvailabilityStateManager: IDisposable
         return Task.CompletedTask;
     }
 
-    private void LoadMetricsFromPersistence()
+    private static DateTime GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(string from) => from switch {
+        "1h" => DateTime.Now.AddHours(-1),
+        "3h" => DateTime.Now.AddHours(-3),
+        "12h" => DateTime.Now.AddHours(-12),
+        "1d" => DateTime.Now.AddDays(-1),
+        "3d" => DateTime.Now.AddDays(-3),
+        "15d" => DateTime.Now.AddDays(-15),
+        "1mo" => DateTime.Now.AddMonths(-1),
+
+        _ => DateTime.Now.AddHours(-1),
+    };
+
+    private void LoadPreExistingReasonsFromPersistence(DateTime fromDate)
     {
-        foreach(var metric in Task.Run(async () => await this._persistence.Load()).Result)
+        Console.WriteLine($"Loading PreExisting reasons from persistence, from {fromDate:yyyy-MM-dd HH:mm:ss}");
+
+        foreach(var metric in Task.Run(async () => await this._persistence.Load(fromDate)).Result)
         {
             if(_currentIdUsedForDowntimePeriods < metric.Id)
                 _currentIdUsedForDowntimePeriods = metric.Id;

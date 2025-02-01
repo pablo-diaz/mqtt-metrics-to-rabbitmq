@@ -17,7 +17,8 @@
   
     "AvailabilityStateManagerConfig": {
       "WorkingStatusLabel": "Produciendo",
-      "StoppedStatusLabel": "Parado"
+      "StoppedStatusLabel": "Parado",
+	  "SinceWhenToLoadPreExistingReasonsFromPersistence": "3h"
     },
 
     "DowntimeReasonsConfig": {

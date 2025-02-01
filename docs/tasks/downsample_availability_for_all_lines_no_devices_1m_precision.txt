@@ -1,0 +1,30 @@
+option task = {
+    name: "downsample_availability_for_all_lines_no_devices_1m_precision",
+    every: 5m,
+    offset: 5s,
+}
+
+contarProduciendoEnPeriodo = (renglon, memoria) =>
+    if memoria.algunoProdujoEnPeriodo then memoria else { algunoProdujoEnPeriodo: renglon._value == "Produciendo" }
+
+from(bucket: "device-metrics-db")
+    |> range(start: -5m)
+    |> filter(fn: (r) => r["_measurement"] == "availability-metric")
+    |> filter(fn: (r) => r["_field"] == "availability")
+    |> keep(columns: ["_value", "_time", "linea"])
+	|> group(columns: ["linea"])
+    |> window(every: 1m)
+    |> reduce(fn: (r, accumulator) => contarProduciendoEnPeriodo(renglon: r, memoria: accumulator),
+        identity: { algunoProdujoEnPeriodo: false})
+    |> group()
+    |> map(
+        fn: (r) =>
+            ({
+                _time: r._start,
+                _measurement: "availability-no-devices",
+                _field: "algunoProdujoEnPeriodo",
+                _value: r.algunoProdujoEnPeriodo,
+                linea: r.linea
+            })
+    )
+    |> to(bucket: "1m-precision", org: "personal")
