@@ -492,3 +492,25 @@ from(bucket: "device-metrics-db")
   |> map(fn: (r) => ({minuto: r._stop, dispositivo: r.device_id, calidad: r.overall_quality_per_min}))
   |> pivot(rowKey: ["minuto"], columnKey: ["dispositivo"], valueColumn: "calidad")
   |> yield(name: "resultado")
+
+----------------------------------------------------------
+import "generate"
+
+unSoloRenglon = generate.from(
+  count: 1,
+  fn: (n) => n,
+  start: 2021-01-01T00:00:00Z,
+  stop: 2021-01-05T00:00:00Z,
+)
+
+obtenerDuracionDeRangoSolicitado = (desdeFecha, hastaFecha) => {
+  fechaInicial = uint(v: desdeFecha)
+  fechaFinal = uint(v: hastaFecha)
+  duracion = fechaFinal - fechaInicial
+
+  return ({ duracion: string(v: duration(v: duracion)) })
+}
+
+unSoloRenglon
+  |> map(fn: (r) => obtenerDuracionDeRangoSolicitado(desdeFecha: v.timeRangeStart, hastaFecha: v.timeRangeStop))
+

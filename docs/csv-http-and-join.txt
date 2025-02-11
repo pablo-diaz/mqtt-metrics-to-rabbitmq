@@ -1,0 +1,70 @@
+import "join"
+import "csv"
+import "experimental/http"
+
+datosCsvDeRazonesSistemaNina = string(v: http.get(url: "http://host.docker.internal:81/report/downtimeReasonsForEveryMinuteInPeriod?from=2025-02-04T12:00:00Z&to=2025-02-04T23:00:00Z&frequency=1m").body)
+
+obtenerDescripcionCodigoParo = (codigoDelParo) =>
+  if      codigoDelParo == "M01" then "Averia"
+  else if codigoDelParo == "M02" then "Ajuste de Mantenimiento"
+  else if codigoDelParo == "M03" then "Servicios Industriales"
+  else if codigoDelParo == "M04" then "Mantenimiento Programado"
+  else if codigoDelParo == "M05" then "Mantenimiento Planeado"
+  else if codigoDelParo == "M06" then "Ajustes finales cambio de formato"
+  else if codigoDelParo == "M09" then "Equipo Anterior Posterior"
+  else if codigoDelParo == "PD01" then "Cambio Programacion por parte de Planeacion"
+  else if codigoDelParo == "PD02" then "Falta de compra o Recepcion insumos"
+  else if codigoDelParo == "L01" then "No entrega materia prima a tiempo"
+  else if codigoDelParo == "L02" then "Sin espacio de almacenamiento"
+  else if codigoDelParo == "P01" then "Paro operativo"
+  else if codigoDelParo == "P02" then "Convencional"
+  else if codigoDelParo == "P03" then "Limpieza y desinfeccion"
+  else if codigoDelParo == "P04" then "Cambio destino lote"
+  else if codigoDelParo == "P05" then "WMS No hay sistema"
+  else if codigoDelParo == "P06" then "Capacitacion Reunion"
+  else if codigoDelParo == "P07" then "Falta de licor elaboracion"
+  else if codigoDelParo == "P08" then "Nivel de llenado"
+  else if codigoDelParo == "C01" then "Defecto de caja o embalaje interno"
+  else if codigoDelParo == "C02" then "Defecto de botella"
+  else if codigoDelParo == "C03" then "Defecto de tapa"
+  else if codigoDelParo == "C04" then "Defecto de etiqueta"
+  else if codigoDelParo == "C05" then "Parametros fisico quimicos fuera de rango"
+  else if codigoDelParo == "001" then "Falla de comunicacion sistema EGE"
+  else "Desconocido"
+
+formatear = (renglon) => ({
+  horas: float(v: renglon.totalMinsPorRazon) / 60.0,
+  motivo: renglon.razon_paro
+})
+
+parosPorMaquinaEnInflux = from(bucket: "razones-paro")
+  |> range(start: 2025-02-04T12:00:00Z, stop: 2025-02-04T23:00:00Z)
+  |> filter(fn: (r) => r["_measurement"] == "razones")
+  |> filter(fn: (r) => r["_field"] == "razon")
+  |> filter(fn: (r) => r._value != "001")
+  |> filter(fn: (r) => r.linea == "linea03")
+  |> map(fn: (r) => ({r with campo_interseccion: string(v: r._time) + "___" + r.device_id}))
+  |> group(columns: ["campo_interseccion"])
+
+datosDesdeWebApp = csv.from(csv: datosCsvDeRazonesSistemaNina, mode: "raw")
+  |> map(fn: (r) => ({r with _time: time(v: r._time)}))
+  |> map(fn: (r) => ({r with campo_interseccion: string(v: r._time) + "___" + r.device_id}))
+  |> group(columns: ["campo_interseccion"])
+
+join.left(
+    left: parosPorMaquinaEnInflux,
+    right: datosDesdeWebApp,
+    on: (l, r) => l.campo_interseccion == r.campo_interseccion,
+    as: (l, r) => ({l with razon_desde_webapp: r.downtime_reason})
+)
+|> fill(column: "razon_desde_webapp", value: "-")
+|> map(fn: (r) => ({r with razon_paro: obtenerDescripcionCodigoParo(codigoDelParo: if r._value == "-" then r.razon_desde_webapp else r._value) }))
+|> keep(columns: ["_time", "device_id", "razon_paro"])
+|> group(columns: ["razon_paro"])
+|> window(every: 1m)
+|> reduce(fn: (r, accumulator) => (accumulator), identity: {totalMinsPorRazon: 1})
+|> group(columns: ["razon_paro"])
+|> reduce(fn: (r, accumulator) => ({totalMinsPorRazon: 1 + accumulator.totalMinsPorRazon}), identity: {totalMinsPorRazon: 0})
+|> group()
+|> map(fn: (r) => formatear(renglon: r))
+|> sort(columns: ["horas"], desc: true)

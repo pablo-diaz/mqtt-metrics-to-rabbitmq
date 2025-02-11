@@ -15,7 +15,7 @@ services:
       retries: 5
     ports:
       - "1883:1883"
-      - "8080:15672"
+      - "127.0.0.1:8080:15672"
     networks:
       - backend_space
 
@@ -25,7 +25,7 @@ services:
     env_file:
       - ./config/docker/influxdb/docker-env-vars
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     networks:
       - backend_space
     healthcheck:
