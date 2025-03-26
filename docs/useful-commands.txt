@@ -54,7 +54,7 @@ docker run -d --name pgtest -e POSTGRES_PASSWORD=prueba2024 postgres:16.3
 
 psql -h host.docker.internal -p 5432 --username stopreasonsdbo --dbname stopreasons
 
-select * from device_downtime_reason;
+select * from device_downtime_reason order by id;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -90,3 +90,7 @@ docker run -it --rm testing-tool:jaime-c8.0-001 --dev-count 2 --met-per-dev 5 --
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 docker ps --format "[{{.State}}] {{.ID}} {{.Names}}"
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+docker compose -f docker-compose-to-test-stop-reasons-webapp.yml up -d

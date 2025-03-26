@@ -24,7 +24,7 @@ public class AvailabilityStateManager: IDisposable
     {
         this._config = config;
         this._persistence = persistence;
-        this.LoadPreExistingReasonsFromPersistence(fromDate: GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(config.SinceWhenToLoadPreExistingReasonsFromPersistence));
+        Task.Run(async () => await this.LoadPreExistingReasonsFromPersistence(fromDate: GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(config.SinceWhenToLoadPreExistingReasonsFromPersistence)));
         this._idGeneratorForDowntimePeriods = () => {
             _currentIdUsedForDowntimePeriods++;
             return _currentIdUsedForDowntimePeriods;
@@ -128,11 +128,12 @@ public class AvailabilityStateManager: IDisposable
         _ => DateTime.Now.AddHours(-1),
     };
 
-    private void LoadPreExistingReasonsFromPersistence(DateTime fromDate)
+    private async Task LoadPreExistingReasonsFromPersistence(DateTime fromDate)
     {
         Console.WriteLine($"Loading PreExisting reasons from persistence, from {fromDate:yyyy-MM-dd HH:mm:ss}");
+        var preExistingRecordsLoaded = await this._persistence.Load(fromDate);
 
-        foreach(var metric in Task.Run(async () => await this._persistence.Load(fromDate)).Result)
+        foreach (var metric in preExistingRecordsLoaded)
         {
             if(_currentIdUsedForDowntimePeriods < metric.Id)
                 _currentIdUsedForDowntimePeriods = metric.Id;
@@ -142,6 +143,8 @@ public class AvailabilityStateManager: IDisposable
 
             _stopsPerDevice[metric.DeviceId].AddPeriod(fromPersistenceMetric: metric);
         }
+
+        Console.WriteLine($"{preExistingRecordsLoaded.Count} PreExisting reasons successfully loaded from persistence");
     }
 
     public void Dispose()

@@ -6,7 +6,20 @@
 
 @if (Model.DowntimePeriodsPerDevice.Any())
 {
+    <label>Establecer esta razón para todas las filas seleccionadas abajo</label>
+    <br />
     <form method="post">
+        <select name="ddlReasonToSetMassively">
+            <option value="">Por favor seleccione una razón para establecer en forma masiva</option>
+            @foreach (var validReason in Model.ValidReasons)
+            {
+            <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
+            }
+        </select>
+        <br /><br />
+        <input class="btn btn-secondary btn-lg" type="submit" value="Establecer en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
+
+        <br /><br /><br />
         <input name="numberOfDowntimePeriods" type="hidden" value=@Model.DowntimePeriodsPerDevice.Count() />
         <table class="table table-striped">
             <thead>
@@ -15,6 +28,7 @@
                     <th>Paro desde</th>
                     <th>Más reciente Paro</th>
                     <th>Razón de Paro</th>
+                    <th style="width: 10px"/>
                 </tr>
             </thead>
             <tbody>
@@ -25,20 +39,21 @@
                     <td>@period.InitiallyStoppedAt</td>
                     <td>@period.LastStopReportedAt</td>
                     <td>
-                        <select name=@period.ReasonFieldName>
-                            <option value="">Por favor seleccione una opción</option>
+                        <select name=@period.ReasonDropDownFieldName>
+                            <option value="">Por favor seleccione una razón</option>
                             @foreach (var validReason in Model.ValidReasons)
                             {
-                            <option value=@validReason.ReasonCode>@validReason.ReasonText</option>
+                            <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
                             }
                         </select>
                     </td>
+                        <td><input class="form-check-input" type="checkbox" name=@period.ReasonCheckBoxFieldName /></td>
                 </tr>
             }
             </tbody>
         </table>
         <br />
-        <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones" />
+        <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones" asp-page-handler="SaveReasonsIndividually" />
     </form>
 }
 else

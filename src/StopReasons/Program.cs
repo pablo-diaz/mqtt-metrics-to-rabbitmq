@@ -24,12 +24,9 @@ builder.Services.Configure<DowntimeReasonsConfig>(builder.Configuration.GetSecti
 
 var app = builder.Build();
 
-//app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
-
-//app.UseAuthorization();
 
 app.MapRazorPages();
 app.MapControllers();

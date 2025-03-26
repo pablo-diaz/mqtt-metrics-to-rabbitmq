@@ -17,15 +17,15 @@ namespace StopReasons.Pages;
 
 public class IndexModel : PageModel
 {
-    private readonly ILogger<IndexModel> _logger;
     private readonly AvailabilityStateManager _availabilityState;
+    private const string _downtimeReasonDropDownPrefix = "drdd_";
+    private const string _downtimeReasonCheckBoxPrefix = "drcb_";
 
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
     public List<(string ReasonText, string ReasonCode)> ValidReasons = new();
 
     public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config)
     {
-        _logger = logger;
         this._availabilityState = availabilityState;
         ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
     }
@@ -33,38 +33,88 @@ public class IndexModel : PageModel
     public void OnGet()
     {
         DowntimePeriodsPerDevice = _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor()
-            .Select(p => new PendingDowntimePeriodToSetReasonsForViewModel(DeviceId: p.deviceId, ReasonFieldName: $"downtimeReason_{p.downtimePeriodId}",
-                InitiallyStoppedAt: $"{p.initiallyStoppedAt:dd/MMM/yyyy hh:mm:ss tt}", LastStopReportedAt: $"{p.lastStopReportedAt:dd/MMM/yyyy hh:mm:ss tt}"))
+            .Select(p => new PendingDowntimePeriodToSetReasonsForViewModel(
+                DeviceId: p.deviceId,
+                InitiallyStoppedAt: $"{p.initiallyStoppedAt:MMM/dd hh:mm:ss tt}",
+                LastStopReportedAt: $"{p.lastStopReportedAt:MMM/dd hh:mm:ss tt}",
+                ReasonDropDownFieldName: $"{_downtimeReasonDropDownPrefix}{p.downtimePeriodId}",
+                ReasonCheckBoxFieldName: $"{_downtimeReasonCheckBoxPrefix}{p.downtimePeriodId}" ))
             .ToArray();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostSaveReasonsIndividuallyAsync()
     {
         if (!ModelState.IsValid)
             return Page();
 
-        foreach(var k in Request.Form.Keys.Where(k => k.StartsWith("downtimeReason_")))
+        foreach(var reasonDropDownFieldName in GetFieldNamesOfReasonDropdowns())
         {
-            var maybeReason = string.IsNullOrEmpty(Request.Form[k]) ? Maybe<string>.None : Maybe<string>.From(Request.Form[k]);
+            var maybeReason = TryGetReason(setInDropDownWithName: reasonDropDownFieldName);
             if(maybeReason.HasNoValue)
                 continue;
 
-            var downtimePeriodId = long.Parse(k.Split('_')[1]);
-            var maybePeriodFound = _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor()
-                .FirstOrDefault(p => p.downtimePeriodId == downtimePeriodId) ?? Maybe<PendingDowntimePeriodToSetReasonsFor>.None;
-
-            if(maybePeriodFound.HasNoValue)
-            {
-                System.Console.WriteLine($"Period '{downtimePeriodId}' was not found");
-                continue;
-            }
-
-            await _availabilityState.SetDowntimeReason(reason: maybeReason.Value, forDeviceId: maybePeriodFound.Value.deviceId, forDowntimePeriodId: maybePeriodFound.Value.downtimePeriodId);
-            System.Console.WriteLine($"Period reason set successfully for '{downtimePeriodId}' downtime period id");
+            await SaveReason(forFieldName: reasonDropDownFieldName, reasonToSet: maybeReason.Value);
         }
 
         return RedirectToPage();
     }
+
+    private Maybe<string> TryGetReason(string setInDropDownWithName)
+    {
+        var maybeValueSetInDropDown = (string) Request.Form[setInDropDownWithName];
+        return string.IsNullOrEmpty(maybeValueSetInDropDown)
+            ? Maybe<string>.None
+            : maybeValueSetInDropDown;
+    }
+
+    private Maybe<PendingDowntimePeriodToSetReasonsFor> TryFindPeriod(long withDowntimePeriodId) =>
+        _availabilityState
+        .GetPendingDowntimePeriodsToSetReasonsFor()
+        .FirstOrDefault(p => p.downtimePeriodId == withDowntimePeriodId)
+        ?? Maybe<PendingDowntimePeriodToSetReasonsFor>.None;
+
+    public async Task<IActionResult> OnPostSaveReasonsMassivelyAsync()
+    {
+        if (!ModelState.IsValid)
+            return Page();
+
+        var maybeReasonToSetMassively = TryGetReason(setInDropDownWithName: "ddlReasonToSetMassively");
+        if (maybeReasonToSetMassively.HasNoValue)
+            return RedirectToPage();
+
+        foreach (var reasonCheckBoxFieldName in GetFieldNamesOfReasonCheckBoxes())
+        {
+            await SaveReason(forFieldName: reasonCheckBoxFieldName, reasonToSet: maybeReasonToSetMassively.Value);
+        }
+
+        return RedirectToPage();
+    }
+
+    private async Task SaveReason(string forFieldName, string reasonToSet)
+    {
+        var downtimePeriodId = long.Parse(forFieldName.Split('_')[1]);
+        var maybePeriodFound = TryFindPeriod(withDowntimePeriodId: downtimePeriodId);
+        if (maybePeriodFound.HasNoValue)
+        {
+            System.Console.Error.WriteLine($"Period '{downtimePeriodId}' was not found");
+            return;
+        }
+
+        await _availabilityState.SetDowntimeReason(
+            reason: reasonToSet,
+            forDeviceId: maybePeriodFound.Value.deviceId,
+            forDowntimePeriodId: maybePeriodFound.Value.downtimePeriodId);
+
+        System.Console.WriteLine($"Period reason set successfully for '{downtimePeriodId}' downtime period id");
+    }
+
+    private IEnumerable<string> GetFieldNamesOfReasonDropdowns() =>
+        Request.Form.Keys.Where(k => k.StartsWith(_downtimeReasonDropDownPrefix));
+
+    private IEnumerable<string> GetFieldNamesOfReasonCheckBoxes() =>
+        Request.Form.Keys.Where(k => k.StartsWith(_downtimeReasonCheckBoxPrefix));
+
 }
 
-public record PendingDowntimePeriodToSetReasonsForViewModel(string DeviceId, string InitiallyStoppedAt, string LastStopReportedAt, string ReasonFieldName);
+public record PendingDowntimePeriodToSetReasonsForViewModel(string DeviceId, string InitiallyStoppedAt, string LastStopReportedAt,
+    string ReasonDropDownFieldName, string ReasonCheckBoxFieldName);
