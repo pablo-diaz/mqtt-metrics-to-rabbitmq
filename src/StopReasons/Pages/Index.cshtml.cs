@@ -35,8 +35,8 @@ public class IndexModel : PageModel
         DowntimePeriodsPerDevice = _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor()
             .Select(p => new PendingDowntimePeriodToSetReasonsForViewModel(
                 DeviceId: p.deviceId,
-                InitiallyStoppedAt: $"{p.initiallyStoppedAt:MMM/dd hh:mm:ss tt}",
-                LastStopReportedAt: $"{p.lastStopReportedAt:MMM/dd hh:mm:ss tt}",
+                InitiallyStoppedAt: $"{p.initiallyStoppedAt:MM/dd hh:mm:ss tt}",
+                LastStopReportedAt: $"{p.lastStopReportedAt:MM/dd hh:mm:ss tt}",
                 ReasonDropDownFieldName: $"{_downtimeReasonDropDownPrefix}{p.downtimePeriodId}",
                 ReasonCheckBoxFieldName: $"{_downtimeReasonCheckBoxPrefix}{p.downtimePeriodId}" ))
             .ToArray();

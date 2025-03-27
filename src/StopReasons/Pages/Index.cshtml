@@ -6,26 +6,29 @@
 
 @if (Model.DowntimePeriodsPerDevice.Any())
 {
-    <label>Establecer esta razón para todas las filas seleccionadas abajo</label>
-    <br />
     <form method="post">
-        <select name="ddlReasonToSetMassively">
-            <option value="">Por favor seleccione una razón para establecer en forma masiva</option>
-            @foreach (var validReason in Model.ValidReasons)
-            {
-            <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
-            }
-        </select>
-        <br /><br />
-        <input class="btn btn-secondary btn-lg" type="submit" value="Establecer en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
+        <div class="card">
+            <div class="card-body">
+                <label>Establecer esta razón para todas las filas seleccionadas abajo</label>
+                <br />
+                <select name="ddlReasonToSetMassively">
+                    <option value="">Por favor seleccione una razón para establecer en forma masiva</option>
+                    @foreach (var validReason in Model.ValidReasons)
+                    {
+                    <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
+                    }
+                </select>
+                <br /><br />
+                <input class="btn btn-secondary btn-lg" type="submit" value="Establecer en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
+            </div>
+        </div>
 
-        <br /><br /><br />
         <input name="numberOfDowntimePeriods" type="hidden" value=@Model.DowntimePeriodsPerDevice.Count() />
-        <table class="table table-striped">
+        <table class="table table-striped" data-toggle="table" data-search="true" data-search-highlight="true">
             <thead>
                 <tr>
-                    <th>Dispositivo</th>
-                    <th>Paro desde</th>
+                    <th data-sortable="true">Dispositivo</th>
+                    <th data-sortable="true">Paro desde</th>
                     <th>Más reciente Paro</th>
                     <th>Razón de Paro</th>
                     <th style="width: 10px"/>

@@ -56,6 +56,8 @@ psql -h host.docker.internal -p 5432 --username stopreasonsdbo --dbname stopreas
 
 select * from device_downtime_reason order by id;
 
+update device_downtime_reason set maybe_stopping_reason = null;
+
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 docker build -t broker-consumer:jaime-c8.0-001 -f config/docker/BrokerConsumer/dockerfile .
