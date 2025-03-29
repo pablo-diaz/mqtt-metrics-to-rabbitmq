@@ -23,11 +23,13 @@ public class IndexModel : PageModel
 
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
     public List<(string ReasonText, string ReasonCode)> ValidReasons = new();
+    private readonly int _maxNumberOfReasonsToDisplay;
 
     public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config)
     {
         this._availabilityState = availabilityState;
         ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
+        _maxNumberOfReasonsToDisplay = config.Value.MaxNumberOfReasonsToDisplay;
     }
 
     public void OnGet()
@@ -38,7 +40,12 @@ public class IndexModel : PageModel
                 InitiallyStoppedAt: $"{p.initiallyStoppedAt:MM/dd hh:mm:ss tt}",
                 LastStopReportedAt: $"{p.lastStopReportedAt:MM/dd hh:mm:ss tt}",
                 ReasonDropDownFieldName: $"{_downtimeReasonDropDownPrefix}{p.downtimePeriodId}",
-                ReasonCheckBoxFieldName: $"{_downtimeReasonCheckBoxPrefix}{p.downtimePeriodId}" ))
+                ReasonCheckBoxFieldName: $"{_downtimeReasonCheckBoxPrefix}{p.downtimePeriodId}",
+                _sourceRecord: p ))
+            .OrderByDescending(p => p._sourceRecord.lastStopReportedAt)
+                .ThenByDescending(p => p._sourceRecord.initiallyStoppedAt)
+                .ThenByDescending(p => p.DeviceId)
+            .Take(_maxNumberOfReasonsToDisplay)
             .ToArray();
     }
 
@@ -116,5 +123,7 @@ public class IndexModel : PageModel
 
 }
 
-public record PendingDowntimePeriodToSetReasonsForViewModel(string DeviceId, string InitiallyStoppedAt, string LastStopReportedAt,
-    string ReasonDropDownFieldName, string ReasonCheckBoxFieldName);
+public record PendingDowntimePeriodToSetReasonsForViewModel(
+    string DeviceId, string InitiallyStoppedAt, string LastStopReportedAt,
+    string ReasonDropDownFieldName, string ReasonCheckBoxFieldName,
+    PendingDowntimePeriodToSetReasonsFor _sourceRecord);

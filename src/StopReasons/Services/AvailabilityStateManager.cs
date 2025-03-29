@@ -24,7 +24,11 @@ public class AvailabilityStateManager: IDisposable
     {
         this._config = config;
         this._persistence = persistence;
-        Task.Run(async () => await this.LoadPreExistingReasonsFromPersistence(fromDate: GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(config.SinceWhenToLoadPreExistingReasonsFromPersistence)));
+        
+        Task.Run(async () =>
+            await this.LoadPreExistingReasonsFromPersistence(
+                fromDate: GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(config.SinceWhenToLoadPreExistingReasonsFromPersistence)));
+        
         this._idGeneratorForDowntimePeriods = () => {
             _currentIdUsedForDowntimePeriods++;
             return _currentIdUsedForDowntimePeriods;

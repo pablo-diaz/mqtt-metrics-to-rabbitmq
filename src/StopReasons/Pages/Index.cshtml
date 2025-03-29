@@ -9,8 +9,7 @@
     <form method="post">
         <div class="card">
             <div class="card-body">
-                <label>Establecer esta razón para todas las filas seleccionadas abajo</label>
-                <br />
+                <h5 class="card-title">Establecer esta razón para todas las filas seleccionadas abajo</h5>
                 <select name="ddlReasonToSetMassively">
                     <option value="">Por favor seleccione una razón para establecer en forma masiva</option>
                     @foreach (var validReason in Model.ValidReasons)
@@ -18,8 +17,8 @@
                     <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
                     }
                 </select>
-                <br /><br />
-                <input class="btn btn-secondary btn-lg" type="submit" value="Establecer en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
+                &nbsp;&nbsp;
+                <input class="btn btn-warning btn-lg" type="submit" onclick="return confirm('Está seguro de querer establecerle esta misma razón a todos los períodos seleccionados abajo?')" value="Establecer esta razón en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
             </div>
         </div>
 
@@ -29,7 +28,7 @@
                 <tr>
                     <th data-sortable="true">Dispositivo</th>
                     <th data-sortable="true">Paro desde</th>
-                    <th>Más reciente Paro</th>
+                    <th data-sortable="true">Más reciente Paro</th>
                     <th>Razón de Paro</th>
                     <th style="width: 10px"/>
                 </tr>
@@ -56,7 +55,7 @@
             </tbody>
         </table>
         <br />
-        <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones" asp-page-handler="SaveReasonsIndividually" />
+        <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones en forma individual" asp-page-handler="SaveReasonsIndividually" />
     </form>
 }
 else
