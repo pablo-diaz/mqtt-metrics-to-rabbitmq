@@ -1,4 +1,4 @@
-using System;
+/*using System;
 
 using CSharpFunctionalExtensions;
 
@@ -27,7 +27,7 @@ public class DowntimePeriod
     public static DowntimePeriod For(IAvailabilityMetricStorage.AvailabilityMetricInStorage fromPersistenceMetric) =>
         new DowntimePeriod(id: fromPersistenceMetric.Id, initiallyStoppedAt: fromPersistenceMetric.InitiallyStoppedAt,
                            lastStoppedMetricTracedAt: fromPersistenceMetric.LastStoppedMetricTracedAt,
-                           isItStillStopped: false, maybeReason: fromPersistenceMetric.MaybeReason);
+                           isItStillStopped: false, maybeReason: Maybe<string>.None);
 
     public void TraceNewStopMetric(DateTime forDate)
     {
@@ -45,3 +45,4 @@ public class DowntimePeriod
         this.MaybeReason = reason;
     }
 }
+*/

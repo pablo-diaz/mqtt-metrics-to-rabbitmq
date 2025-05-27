@@ -9,6 +9,5 @@ public class DowntimeReasonsConfig
     }
 
     public ReasonInfo[] AllowedReasons { get; set; }
-    public int MaxNumberOfReasonsToDisplay { get; set; }
 
 }

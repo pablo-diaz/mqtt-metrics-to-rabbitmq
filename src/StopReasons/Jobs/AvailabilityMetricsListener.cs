@@ -14,7 +14,7 @@ public class AvailabilityMetricsListener: IHostedService, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private IServiceScope _serviceScope = null;
     private IMessageReceiver _messageReceiver = null;
-    private AvailabilityStateManager _availabilityStateManager = null;
+    private IntegrationService _integrationService = null;
 
     public AvailabilityMetricsListener(IServiceProvider serviceProvider)
     {
@@ -23,7 +23,7 @@ public class AvailabilityMetricsListener: IHostedService, IDisposable
 
     public void Dispose()
     {
-        _availabilityStateManager?.Dispose();
+        _integrationService?.Dispose();
         _messageReceiver?.Dispose();
         _serviceScope?.Dispose();
     }
@@ -34,9 +34,9 @@ public class AvailabilityMetricsListener: IHostedService, IDisposable
         {
             _serviceScope = this._serviceProvider.CreateScope();
             _messageReceiver = _serviceScope.ServiceProvider.GetRequiredService<IMessageReceiver>();
-            _availabilityStateManager = _serviceScope.ServiceProvider.GetRequiredService<AvailabilityStateManager>();
-            System.Console.WriteLine("Listening on availability messages ...");
-            return _messageReceiver.StartReceivingMessages(async message => await _availabilityStateManager.Process(message));
+            _integrationService = _serviceScope.ServiceProvider.GetRequiredService<IntegrationService>();
+            Console.WriteLine("Listening on availability messages ...");
+            return _messageReceiver.StartReceivingMessages(async message => await _integrationService.ProcessIntegrationMessage(message));
         }
         catch(Exception ex)
         {
@@ -50,4 +50,5 @@ public class AvailabilityMetricsListener: IHostedService, IDisposable
         this.Dispose();
         return Task.CompletedTask;
     }
+
 }

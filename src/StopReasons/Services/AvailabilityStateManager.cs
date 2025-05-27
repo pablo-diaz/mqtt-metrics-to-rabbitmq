@@ -7,152 +7,75 @@ using CSharpFunctionalExtensions;
 
 namespace StopReasons.Services;
 
-public class AvailabilityStateManager: IDisposable
+public class AvailabilityStateManager
 {
-    private readonly AvailabilityStateManagerConfig _config;
-    private readonly IAvailabilityMetricStorage _persistence;
-    private readonly Dictionary<string, DeviceDowntimePeriodsTracker> _stopsPerDevice = new();
-    
-    private long _currentIdUsedForDowntimePeriods = 0;
-    private readonly Func<long> _idGeneratorForDowntimePeriods;
-
     private const int _hack_hoursInBogota = -5;
+    private readonly IAvailabilityMetricStorage _persistence;
 
     public sealed record PeriodToReport(DateTimeOffset From, DateTimeOffset To);
+    public sealed record StoppingPeriodWithReasonSet(string DeviceId, DateTime InitiallyStoppedAt, DateTime LastStopReportedAt, string StoppingReason);
 
-    public AvailabilityStateManager(AvailabilityStateManagerConfig config, IAvailabilityMetricStorage persistence)
+    public AvailabilityStateManager(IAvailabilityMetricStorage persistence)
     {
-        this._config = config;
         this._persistence = persistence;
-        
-        Task.Run(async () =>
-            await this.LoadPreExistingReasonsFromPersistence(
-                fromDate: GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(config.SinceWhenToLoadPreExistingReasonsFromPersistence)));
-        
-        this._idGeneratorForDowntimePeriods = () => {
-            _currentIdUsedForDowntimePeriods++;
-            return _currentIdUsedForDowntimePeriods;
-        };
     }
-
-    public async Task Process(string message)
+    
+    public async Task SetDowntimeReason(string reason, long forDowntimePeriodId)
     {
-        var messageParsedResult = AvailabilityMetric.From(message,
-            withAllowedStates: (workingStateLabel: _config.WorkingStatusLabel, stoppedStateLabel: _config.StoppedStatusLabel));
-        if(messageParsedResult.IsFailure)
-        {
-            System.Console.WriteLine("[AvailabilityStateManager] " + messageParsedResult.Error);
-            return;
-        }
-
-        var processingResult = await Process(metric: messageParsedResult.Value);
-        if(processingResult.IsFailure)
-        {
-            System.Console.WriteLine("[AvailabilityStateManager] " + processingResult.Error);
-            return;
-        }
-
-        System.Console.WriteLine("[AvailabilityStateManager] Message was processed successfully: " + messageParsedResult.Value);
-    }
-
-    public async Task<Result> SetDowntimeReason(string reason, string forDeviceId, long forDowntimePeriodId)
-    {
-        if(_stopsPerDevice.ContainsKey(forDeviceId) == false)
-            return Result.Failure($"Device id '{forDeviceId}' was not found");
-
         await _persistence.StoreReason(id: forDowntimePeriodId, reason: reason);
-
-        return _stopsPerDevice[forDeviceId].SetDowntimeReason(reason: reason, forDowntimePeriodId: forDowntimePeriodId);
     }
 
-    public IEnumerable<PendingDowntimePeriodToSetReasonsFor> GetPendingDowntimePeriodsToSetReasonsFor() =>
-        _stopsPerDevice.Select(kv => (devId: kv.Key, pendings: kv.Value.GetPendingDowntimePeriodsToSetReasonsFor()))
-                       .SelectMany(t => t.pendings, (t, p) => p with { deviceId = t.devId });
+    public sealed record LoadingParams(int PageNumber, int PageSize, string SortingColumn, string SortingDirection);
 
-    public IEnumerable<DowntimePeriodWithReasonSet> GetMostRecentDowntimeReasons(PeriodToReport inPeriod) =>
-        _stopsPerDevice.Select(kv => (devId: kv.Key, periods: kv.Value.GetPeriodsWithReasonSet(from: GetLocalTime(inPeriod.From), to: GetLocalTime(inPeriod.To))))
-                       .SelectMany(t => t.periods, (t, p) => p with { deviceId = t.devId });
+    public sealed record PendingDowntimePeriodToSetReasonsFor(string DeviceId, long DowntimePeriodId, DateTime InitiallyStoppedAt, DateTime LastStopReportedAt);
+    public sealed record LoadingResponse(List<PendingDowntimePeriodToSetReasonsFor> StopingPeriods, int TotalNumberOfPeriods, int NumberOfPages);
+
+    public async Task<LoadingResponse> GetPendingDowntimePeriodsToSetReasonsFor(LoadingParams withParams)
+    {
+        var pendingReasonsLoadedFromPersistence = await _persistence
+            .LoadPendingStopReasonsToSet(offsetInfo: MapLoadingOffset(from: withParams), sortingCriteria: MapLoadingOrder(from: withParams));
+
+        return new(
+            StopingPeriods: pendingReasonsLoadedFromPersistence
+                .RecordsLoaded
+                .Select(Map)
+                .ToList(),
+            TotalNumberOfPeriods: pendingReasonsLoadedFromPersistence.TotalRecordCount,
+            NumberOfPages: (int)Math.Ceiling((decimal)pendingReasonsLoadedFromPersistence.TotalRecordCount / (decimal)withParams.PageSize)
+        );
+    }
+
+    private static PendingDowntimePeriodToSetReasonsFor Map(IAvailabilityMetricStorage.AvailabilityMetricInStorage from) =>
+        new(DeviceId: from.DeviceId, DowntimePeriodId: from.Id, InitiallyStoppedAt: from.InitiallyStoppedAt, LastStopReportedAt: from.LastStoppedMetricTracedAt);
+
+    private static IAvailabilityMetricStorage.LoadingOffset MapLoadingOffset(LoadingParams from) =>
+        new(Offset: (from.PageNumber - 1) * from.PageSize, Count: from.PageSize);
+
+    private static IAvailabilityMetricStorage.LoadingOrder MapLoadingOrder(LoadingParams from) =>
+        new(
+            Column: from.SortingColumn switch {
+                "device" => IAvailabilityMetricStorage.AllowedSortingColumns.DEVICE,
+                "period_start" => IAvailabilityMetricStorage.AllowedSortingColumns.PERIOD_START,
+                "most_recent_time_reported" => IAvailabilityMetricStorage.AllowedSortingColumns.MOST_RECENT_TIME_REPORTED,
+                _ => IAvailabilityMetricStorage.AllowedSortingColumns.DEVICE
+            },
+            Direction: from.SortingDirection.ToLower().Trim() == "asc"
+                ? IAvailabilityMetricStorage.SortingDirection.ASCENDENT
+                : IAvailabilityMetricStorage.SortingDirection.DESCENDENT
+        );
+
+    public async Task<List<StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(PeriodToReport inPeriod) =>
+        (await _persistence.GetMostRecentDowntimeReasons(
+            from: GetLocalTime(inPeriod.From),
+            to: GetLocalTime(inPeriod.To)))
+        .Select(Map)
+        .ToList();
+
+    private static StoppingPeriodWithReasonSet Map(IAvailabilityMetricStorage.StoppingPeriodWithReasonSet from) =>
+        new StoppingPeriodWithReasonSet(DeviceId: from.DeviceId, InitiallyStoppedAt: from.InitiallyStoppedAt,
+            LastStopReportedAt: from.LastStopReportedAt, StoppingReason: from.StoppingReason);
 
     private static DateTime GetLocalTime(DateTimeOffset from) =>
         from.DateTime.AddHours(_hack_hoursInBogota);  // TODO: I'm being lazy and I will find a better way soon
-
-    private async Task<Result> Process(AvailabilityMetric metric)
-    {
-        if(_stopsPerDevice.ContainsKey(metric.DeviceId) == false)
-            _stopsPerDevice[metric.DeviceId] = new DeviceDowntimePeriodsTracker();
-
-        var shouldUpdateLastStoppedAt = false;
-        var shouldAddNewRecord = false;
-        var periodIdInContext = 0L;
-
-        var result = _stopsPerDevice[metric.DeviceId].Process(metric, idsGeneratorFn: _idGeneratorForDowntimePeriods,
-                        listeners: (
-                            OnAdding: newPeriodId => {
-                                shouldAddNewRecord = true;
-                                periodIdInContext = newPeriodId;
-                            },
-                            
-                            OnUpdatingLastStoppedAt: forPeriodId => {
-                                shouldUpdateLastStoppedAt = true;
-                                periodIdInContext = forPeriodId;
-                            }
-                        )
-                    );
-
-        if(result.IsFailure)
-            return result;
-
-        await PersistChanges(forPeriodId: periodIdInContext, withMetric: metric, actionToPerform: (ShouldUpdateLastStoppedAt: shouldUpdateLastStoppedAt, ShouldAddNewRecord: shouldAddNewRecord));
-
-        return Result.Success();
-    }
-
-    private Task PersistChanges(long forPeriodId, AvailabilityMetric withMetric, (bool ShouldUpdateLastStoppedAt, bool ShouldAddNewRecord) actionToPerform)
-    {
-        if(actionToPerform.ShouldAddNewRecord)
-            return _persistence.Add(new IAvailabilityMetricStorage.AvailabilityMetricInStorage(
-                        Id: forPeriodId, DeviceId: withMetric.DeviceId, InitiallyStoppedAt: withMetric.TracedAt, LastStoppedMetricTracedAt: withMetric.TracedAt,
-                        MaybeReason: withMetric.MaybeDowntimeReason));
-
-        if(actionToPerform.ShouldUpdateLastStoppedAt)
-            return _persistence.UpdateLastStoppedMetricTracedAt(id: forPeriodId, at: withMetric.TracedAt);
-
-        return Task.CompletedTask;
-    }
-
-    private static DateTime GetDateSinceWhenToLoadPreExistingReasonsFromPersistence(string from) => from switch {
-        "1h" => DateTime.Now.AddHours(-1),
-        "3h" => DateTime.Now.AddHours(-3),
-        "12h" => DateTime.Now.AddHours(-12),
-        "1d" => DateTime.Now.AddDays(-1),
-        "3d" => DateTime.Now.AddDays(-3),
-        "15d" => DateTime.Now.AddDays(-15),
-        "1mo" => DateTime.Now.AddMonths(-1),
-
-        _ => DateTime.Now.AddHours(-1),
-    };
-
-    private async Task LoadPreExistingReasonsFromPersistence(DateTime fromDate)
-    {
-        Console.WriteLine($"Loading PreExisting reasons from persistence, from {fromDate:yyyy-MM-dd HH:mm:ss}");
-        var preExistingRecordsLoaded = await this._persistence.Load(fromDate);
-
-        foreach (var metric in preExistingRecordsLoaded)
-        {
-            if(_currentIdUsedForDowntimePeriods < metric.Id)
-                _currentIdUsedForDowntimePeriods = metric.Id;
-
-            if(_stopsPerDevice.ContainsKey(metric.DeviceId) == false)
-                _stopsPerDevice[metric.DeviceId] = new DeviceDowntimePeriodsTracker();
-
-            _stopsPerDevice[metric.DeviceId].AddPeriod(fromPersistenceMetric: metric);
-        }
-
-        Console.WriteLine($"{preExistingRecordsLoaded.Count} PreExisting reasons successfully loaded from persistence");
-    }
-
-    public void Dispose()
-    {
-        _persistence?.Dispose();
-    }
+    
 }

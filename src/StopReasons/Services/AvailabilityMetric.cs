@@ -58,5 +58,13 @@ public class AvailabilityMetric
     };
 
     public override string ToString() =>
-        $"{DeviceId} - {Type} - {TracedAt:yyyy-MM-dd hh:mm:ss tt}";
+        Type == AvailabilityType.WORKING
+        ? $"{DeviceId} - {Type} - {TracedAt:yyyy-MM-dd hh:mm:ss tt}"
+        : $"{DeviceId} - {Type} - Reason: '{MaybeDowntimeReason}' - {TracedAt:yyyy-MM-dd hh:mm:ss tt}";
+
+    public Maybe<bool> IsStoppingReasonKnown =>
+        this.Type == AvailabilityType.STOPPED
+        ? Maybe<bool>.From(MaybeDowntimeReason.HasValue)
+        : Maybe<bool>.None;
+
 }

@@ -1,4 +1,4 @@
-using System;
+/*using System;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -77,14 +77,17 @@ public class DeviceDowntimePeriodsTracker
 
     private Maybe<DowntimePeriod> FindCurrentStoppedPeriod() =>
         _periods.FirstOrDefault(p => p.IsItStillStopped) ?? Maybe<DowntimePeriod>.None;
+    
+    private record PendingDowntimePeriodToSetReasonsFor(long downtimePeriodId, DateTime initiallyStoppedAt, DateTime lastStopReportedAt)
+    {
+        public string deviceId { get; set; } = "";
+    }
+
+    private record DowntimePeriodWithReasonSet(DateTime initiallyStoppedAt, DateTime lastStopReportedAt, string reason)
+    {
+        public string deviceId { get; set; } = "";
+    }
+
 }
 
-public record PendingDowntimePeriodToSetReasonsFor(long downtimePeriodId, DateTime initiallyStoppedAt, DateTime lastStopReportedAt)
-{
-    public string deviceId { get; set; } = "";
-}
-
-public record DowntimePeriodWithReasonSet(DateTime initiallyStoppedAt, DateTime lastStopReportedAt, string reason)
-{
-    public string deviceId { get; set; } = "";
-}
+*/

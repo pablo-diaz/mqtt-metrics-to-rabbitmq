@@ -22,31 +22,24 @@ public class IndexModel : PageModel
     private const string _downtimeReasonCheckBoxPrefix = "drcb_";
 
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
-    public List<(string ReasonText, string ReasonCode)> ValidReasons = new();
-    private readonly int _maxNumberOfReasonsToDisplay;
+    public readonly List<(string ReasonText, string ReasonCode)> ValidReasons = new();
 
     public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config)
     {
         this._availabilityState = availabilityState;
-        ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
-        _maxNumberOfReasonsToDisplay = config.Value.MaxNumberOfReasonsToDisplay;
+        this.ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
     }
 
-    public void OnGet()
+    public async Task OnGet()
     {
-        DowntimePeriodsPerDevice = _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor()
-            .Select(p => new PendingDowntimePeriodToSetReasonsForViewModel(
-                DeviceId: p.deviceId,
-                InitiallyStoppedAt: $"{p.initiallyStoppedAt:MM/dd hh:mm:ss tt}",
-                LastStopReportedAt: $"{p.lastStopReportedAt:MM/dd hh:mm:ss tt}",
-                ReasonDropDownFieldName: $"{_downtimeReasonDropDownPrefix}{p.downtimePeriodId}",
-                ReasonCheckBoxFieldName: $"{_downtimeReasonCheckBoxPrefix}{p.downtimePeriodId}",
-                _sourceRecord: p ))
-            .OrderByDescending(p => p._sourceRecord.lastStopReportedAt)
-                .ThenByDescending(p => p._sourceRecord.initiallyStoppedAt)
-                .ThenByDescending(p => p.DeviceId)
-            .Take(_maxNumberOfReasonsToDisplay)
-            .ToArray();
+        var response = await _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor(withParams: new(
+            PageNumber: 1,
+            PageSize: 10,
+            SortingColumn: "device",
+            SortingDirection: "asc"
+        ));
+
+        DowntimePeriodsPerDevice = response.StopingPeriods.Select(MapToViewModel).ToArray();
     }
 
     public async Task<IActionResult> OnPostSaveReasonsIndividuallyAsync()
@@ -66,20 +59,6 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
-    private Maybe<string> TryGetReason(string setInDropDownWithName)
-    {
-        var maybeValueSetInDropDown = (string) Request.Form[setInDropDownWithName];
-        return string.IsNullOrEmpty(maybeValueSetInDropDown)
-            ? Maybe<string>.None
-            : maybeValueSetInDropDown;
-    }
-
-    private Maybe<PendingDowntimePeriodToSetReasonsFor> TryFindPeriod(long withDowntimePeriodId) =>
-        _availabilityState
-        .GetPendingDowntimePeriodsToSetReasonsFor()
-        .FirstOrDefault(p => p.downtimePeriodId == withDowntimePeriodId)
-        ?? Maybe<PendingDowntimePeriodToSetReasonsFor>.None;
-
     public async Task<IActionResult> OnPostSaveReasonsMassivelyAsync()
     {
         if (!ModelState.IsValid)
@@ -97,20 +76,30 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    private Maybe<string> TryGetReason(string setInDropDownWithName)
+    {
+        var maybeValueSetInDropDown = (string) Request.Form[setInDropDownWithName];
+        return string.IsNullOrEmpty(maybeValueSetInDropDown)
+            ? Maybe<string>.None
+            : maybeValueSetInDropDown;
+    }
+
+    private static PendingDowntimePeriodToSetReasonsForViewModel MapToViewModel(AvailabilityStateManager.PendingDowntimePeriodToSetReasonsFor from) =>
+        new PendingDowntimePeriodToSetReasonsForViewModel(
+            DeviceId: from.DeviceId,
+            InitiallyStoppedAt: $"{from.InitiallyStoppedAt:MM/dd hh:mm:ss tt}",
+            LastStopReportedAt: $"{from.LastStopReportedAt:MM/dd hh:mm:ss tt}",
+            ReasonDropDownFieldName: $"{_downtimeReasonDropDownPrefix}{from.DowntimePeriodId}",
+            ReasonCheckBoxFieldName: $"{_downtimeReasonCheckBoxPrefix}{from.DowntimePeriodId}",
+            _sourceRecord: from);
+
     private async Task SaveReason(string forFieldName, string reasonToSet)
     {
         var downtimePeriodId = long.Parse(forFieldName.Split('_')[1]);
-        var maybePeriodFound = TryFindPeriod(withDowntimePeriodId: downtimePeriodId);
-        if (maybePeriodFound.HasNoValue)
-        {
-            System.Console.Error.WriteLine($"Period '{downtimePeriodId}' was not found");
-            return;
-        }
 
         await _availabilityState.SetDowntimeReason(
             reason: reasonToSet,
-            forDeviceId: maybePeriodFound.Value.deviceId,
-            forDowntimePeriodId: maybePeriodFound.Value.downtimePeriodId);
+            forDowntimePeriodId: downtimePeriodId);
 
         System.Console.WriteLine($"Period reason set successfully for '{downtimePeriodId}' downtime period id");
     }
@@ -126,4 +115,4 @@ public class IndexModel : PageModel
 public record PendingDowntimePeriodToSetReasonsForViewModel(
     string DeviceId, string InitiallyStoppedAt, string LastStopReportedAt,
     string ReasonDropDownFieldName, string ReasonCheckBoxFieldName,
-    PendingDowntimePeriodToSetReasonsFor _sourceRecord);
+    AvailabilityStateManager.PendingDowntimePeriodToSetReasonsFor _sourceRecord);

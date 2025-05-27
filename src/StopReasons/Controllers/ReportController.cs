@@ -1,10 +1,11 @@
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using Microsoft.AspNetCore.Mvc;
 
 using StopReasons.Services;
-using System;
 
 namespace StopReasons.Controllers;
 
@@ -20,8 +21,8 @@ public class ReportController: ControllerBase
     }
 
     [HttpGet("downtimeReasonsForEveryMinuteInPeriod")]
-    public IActionResult GetDowntimeReasonsForEveryMinuteInPeriod([FromQuery] string from, [FromQuery] string to, [FromQuery] string frequency) =>
-        Content(content: $"{GetCsvHeader()}\n{GetDummyEntry()}\n{GetCsvRowsForDowntimePeriods(from, to, GetTimeFrequencyOfRegistriesInPeriod(frequency))}", contentType: "text/csv");
+    public async Task<IActionResult> GetDowntimeReasonsForEveryMinuteInPeriod([FromQuery] string from, [FromQuery] string to, [FromQuery] string frequency) =>
+        Content(content: $"{GetCsvHeader()}\n{GetDummyEntry()}\n{await GetCsvRowsForDowntimePeriods(from, to, GetTimeFrequencyOfRegistriesInPeriod(frequency))}", contentType: "text/csv");
 
     private static string GetCsvHeader() =>
         "_time,device_id,downtime_reason";
@@ -29,16 +30,16 @@ public class ReportController: ControllerBase
     private static string GetDummyEntry() =>
         "2020-01-01T00:00:01.000000000Z,NoDev,NoReason";  // this is used, so that Flux queries do not break on empty CSV result sets
 
-    private string GetCsvRowsForDowntimePeriods(string fromGmtDate, string toGmtDate, TimeSpan timeFrequencyOfRegistriesInPeriod) =>
+    private async Task<string> GetCsvRowsForDowntimePeriods(string fromGmtDate, string toGmtDate, TimeSpan timeFrequencyOfRegistriesInPeriod) =>
         string.Join(separator: "\n",
-            values: this._availabilityState.GetMostRecentDowntimeReasons(inPeriod: new (From: DateTimeOffset.Parse(fromGmtDate), To: DateTimeOffset.Parse(toGmtDate)))
-                .SelectMany(p => {
+            values: (await this._availabilityState.GetMostRecentDowntimeReasons(inPeriod: new (From: DateTimeOffset.Parse(fromGmtDate), To: DateTimeOffset.Parse(toGmtDate))))
+                .Select(p => {
                     var csvLinesForPeriod = new List<string>();
-                    for(var date = p.initiallyStoppedAt; date <= p.lastStopReportedAt; date = date.Add(timeFrequencyOfRegistriesInPeriod))
+                    for(var date = p.InitiallyStoppedAt; date <= p.LastStopReportedAt; date = date.Add(timeFrequencyOfRegistriesInPeriod))
                     {
                         var adjustedDateForInfluxQueriesPurposes = $"{NormalizeDateToUTC(date):yyyy-MM-ddTHH:mm}:00.000000000Z";
-                        var adjustedReasonForCsvPurposes = p.reason.Replace(",", " ").Replace("\n", " ");
-                        csvLinesForPeriod.Add($"{adjustedDateForInfluxQueriesPurposes},{p.deviceId},{adjustedReasonForCsvPurposes}");
+                        var adjustedReasonForCsvPurposes = p.StoppingReason.Replace(",", " ").Replace("\n", " ");
+                        csvLinesForPeriod.Add($"{adjustedDateForInfluxQueriesPurposes},{p.DeviceId},{adjustedReasonForCsvPurposes}");
                     }
                     return csvLinesForPeriod;
                 })

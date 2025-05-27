@@ -6,6 +6,8 @@ using StopReasons.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
+using Microsoft.Extensions.Options;
+
 namespace StopReasons.Infra;
 
 // https://www.rabbitmq.com/dotnet-api-guide.html
@@ -15,9 +17,9 @@ public sealed class RabbitMqMessageReceiver : IMessageReceiver
     private readonly IConnection _conn;
     private readonly IModel _channel;
 
-    public RabbitMqMessageReceiver(RabbitMqConfiguration config)
+    public RabbitMqMessageReceiver(IOptions<RabbitMqConfiguration> config)
     {
-        this._config = config;
+        this._config = config.Value;
 
         var factory = new ConnectionFactory();
         factory.Uri = new Uri(_config.ConnectionString);
@@ -73,4 +75,5 @@ public sealed class RabbitMqMessageReceiver : IMessageReceiver
 
         return Task.CompletedTask;
     }
+
 }

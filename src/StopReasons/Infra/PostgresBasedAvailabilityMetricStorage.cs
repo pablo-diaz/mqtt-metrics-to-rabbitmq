@@ -8,44 +8,67 @@ using StopReasons.Services;
 using Dapper;
 using Npgsql;
 using CSharpFunctionalExtensions;
+using Microsoft.Extensions.Options;
 
 namespace StopReasons.Infra;
 
 public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
 {
-    private record DbDto(long id, string device_id, DateTime initially_stopped_at, DateTime last_stopped_metric_traced_at, string maybe_stopping_reason)
+    private record DbDto(long id, string device_id, DateTime initially_stopped_at, DateTime last_stopped_metric_traced_at)
     {
         public IAvailabilityMetricStorage.AvailabilityMetricInStorage Map() =>
             new IAvailabilityMetricStorage.AvailabilityMetricInStorage(Id: this.id, DeviceId: this.device_id,
-                InitiallyStoppedAt: this.initially_stopped_at, LastStoppedMetricTracedAt: this.last_stopped_metric_traced_at,
-                MaybeReason: string.IsNullOrEmpty(this.maybe_stopping_reason) ? Maybe<string>.None : Maybe<string>.From(this.maybe_stopping_reason));
+                InitiallyStoppedAt: this.initially_stopped_at, LastStoppedMetricTracedAt: this.last_stopped_metric_traced_at);
+    }
+
+    private sealed record AnotherDbDto(string device_id, DateTime initially_stopped_at, DateTime last_stopped_metric_traced_at, string maybe_stopping_reason)
+    {
+        public IAvailabilityMetricStorage.StoppingPeriodWithReasonSet Map() =>
+            new (DeviceId: this.device_id, InitiallyStoppedAt: this.initially_stopped_at, LastStopReportedAt: this.last_stopped_metric_traced_at, StoppingReason: this.maybe_stopping_reason);
     }
 
     private readonly NpgsqlConnection _connection;
 
-    public PostgresBasedAvailabilityMetricStorage(PostgresConfig config)
+    public PostgresBasedAvailabilityMetricStorage(IOptions<PostgresConfig> config)
     {
-        _connection = new NpgsqlConnection(config.ConnectionString);
+        _connection = new NpgsqlConnection(config.Value.ConnectionString);
         _connection.Open();
     }
 
-    public Task Add(IAvailabilityMetricStorage.AvailabilityMetricInStorage metric)
+    public async Task<long> GetCurrentIdUsedForDowntimePeriods()
     {
-        var commandText = @"INSERT INTO device_downtime_reason (id, device_id, initially_stopped_at, last_stopped_metric_traced_at, maybe_stopping_reason)
-                            VALUES (@id, @device_id, @initially_stopped_at, @last_stopped_metric_traced_at, @maybe_stopping_reason)";
+        var commandText = @$"SELECT Max(id)
+                            FROM device_downtime_reason";
+
+        return await _connection.QueryFirstAsync<long>(sql: commandText);
+    }
+
+    public async Task<Maybe<long>> GetDowntimePeriodIdOfMostRecentStoppedPeriod(string forDeviceId)
+    {
+        var commandText = @$"SELECT max(id)
+                            FROM device_downtime_reason
+                            WHERE device_id = @device_id
+                                AND is_it_still_stopped = TRUE";
+
+        return (await _connection.QueryFirstOrDefaultAsync<long?>(sql: commandText, param: new { device_id = forDeviceId })) ?? Maybe<long>.None;
+    }
+
+    public async Task Add(IAvailabilityMetricStorage.AvailabilityMetricInStorage metric)
+    {
+        var commandText = @"INSERT INTO device_downtime_reason (id, device_id, initially_stopped_at, last_stopped_metric_traced_at, is_it_still_stopped)
+                            VALUES (@id, @device_id, @initially_stopped_at, @last_stopped_metric_traced_at, TRUE)";
 
         var queryArguments = new {
             id = metric.Id,
             device_id = metric.DeviceId,
             initially_stopped_at = metric.InitiallyStoppedAt,
-            last_stopped_metric_traced_at = metric.LastStoppedMetricTracedAt,
-            maybe_stopping_reason = metric.MaybeReason.HasValue ? metric.MaybeReason.Value : null
+            last_stopped_metric_traced_at = metric.LastStoppedMetricTracedAt
         };
 
-        return _connection.ExecuteAsync(commandText, queryArguments);
+        await _connection.ExecuteAsync(commandText, queryArguments);
     }
     
-    public Task StoreReason(long id, string reason)
+    public async Task StoreReason(long id, string reason)
     {
         var commandText = @"UPDATE device_downtime_reason
                             SET maybe_stopping_reason = @maybe_stopping_reason
@@ -56,38 +79,77 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
             maybe_stopping_reason = reason
         };
 
-        return _connection.ExecuteAsync(commandText, queryArguments);
+        await _connection.ExecuteAsync(commandText, queryArguments);
     }
     
-    public Task UpdateLastStoppedMetricTracedAt(long id, DateTime at)
+    public async Task UpdateLastStoppedMetricTracedAt(long id, DateTime at, bool isItStillStopped)
     {
         var commandText = @"UPDATE device_downtime_reason
-                            SET last_stopped_metric_traced_at = @last_stopped_metric_traced_at
+                            SET
+                                last_stopped_metric_traced_at = @last_stopped_metric_traced_at,
+                                is_it_still_stopped = @isItStillStopped
                             where id = @id";
 
         var queryArguments = new {
-            id = id,
-            last_stopped_metric_traced_at = at
+            id,
+            last_stopped_metric_traced_at = at,
+            isItStillStopped
         };
 
-        return _connection.ExecuteAsync(commandText, queryArguments);
+        await _connection.ExecuteAsync(commandText, queryArguments);
     }
     
-    public async Task<List<IAvailabilityMetricStorage.AvailabilityMetricInStorage>> Load(DateTime from)
+    public async Task<IAvailabilityMetricStorage.LoadingResponse> LoadPendingStopReasonsToSet(
+        IAvailabilityMetricStorage.LoadingOffset offsetInfo, IAvailabilityMetricStorage.LoadingOrder sortingCriteria)
     {
-        var commandText = @"SELECT id, device_id, initially_stopped_at, last_stopped_metric_traced_at, maybe_stopping_reason
+        var totalSqlText = @$"SELECT count(*)
                             FROM device_downtime_reason
-                            WHERE (
-                                    @pFromDate BETWEEN initially_stopped_at AND last_stopped_metric_traced_at
-                                OR
-                                    @pFromDate < initially_stopped_at
-                                )
-                            ORDER BY id";
+                            WHERE maybe_stopping_reason is null";
 
-        return (await _connection.QueryAsync<DbDto>(commandText, param: new { pFromDate = from }))
-               .Select(r => r.Map())
-               .ToList();
+        var commandText = @$"SELECT id, device_id, initially_stopped_at, last_stopped_metric_traced_at
+                            FROM device_downtime_reason
+                            WHERE maybe_stopping_reason is null
+                            ORDER BY {Map(from: sortingCriteria)}
+                            LIMIT @pCount
+                            OFFSET @pOffset";
+
+        return new IAvailabilityMetricStorage.LoadingResponse(
+            RecordsLoaded: (await _connection.QueryAsync<DbDto>(commandText, param: new { pCount = offsetInfo.Count, pOffset = offsetInfo.Offset })).Select(r => r.Map()).ToList(),
+            TotalRecordCount: await _connection.QueryFirstAsync<int>(sql: totalSqlText));
     }
+
+    public async Task<List<IAvailabilityMetricStorage.StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(DateTimeOffset from, DateTimeOffset to)
+    {
+        var commandText = @$"SELECT device_id, initially_stopped_at, last_stopped_metric_traced_at, maybe_stopping_reason
+                            FROM device_downtime_reason
+                            WHERE maybe_stopping_reason is not null
+                                AND initially_stopped_at <= @to
+                                AND last_stopped_metric_traced_at >= @from";
+
+        return (await _connection.QueryAsync<AnotherDbDto>(sql: commandText, param: new { from, to }))
+            .Select(r => r.Map())
+            .ToList();
+    }
+
+    private static string Map(IAvailabilityMetricStorage.LoadingOrder from)
+    {
+        var sortingColumn = from.Column switch {
+            IAvailabilityMetricStorage.AllowedSortingColumns.DEVICE =>                      "device_id",
+            IAvailabilityMetricStorage.AllowedSortingColumns.PERIOD_START =>                "initially_stopped_at",
+            IAvailabilityMetricStorage.AllowedSortingColumns.MOST_RECENT_TIME_REPORTED =>   "last_stopped_metric_traced_at",
+
+            _ => "id"
+        };
+
+        var sortingDirection = from.Direction switch {
+            IAvailabilityMetricStorage.SortingDirection.ASCENDENT => "ASC",
+            IAvailabilityMetricStorage.SortingDirection.DESCENDENT => "DESC",
+
+            _ => "ASC"
+        };
+
+        return $"{sortingColumn} {sortingDirection}";
+    } 
 
     public void Dispose()
     {
@@ -97,4 +159,5 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
             _connection.Dispose();
         }
     }
+
 }
