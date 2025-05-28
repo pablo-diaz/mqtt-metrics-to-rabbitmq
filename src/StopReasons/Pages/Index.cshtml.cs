@@ -12,6 +12,7 @@ using CSharpFunctionalExtensions;
 
 using StopReasons.Config;
 using StopReasons.Services;
+using System;
 
 namespace StopReasons.Pages;
 
@@ -24,22 +25,53 @@ public class IndexModel : PageModel
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
     public readonly List<(string ReasonText, string ReasonCode)> ValidReasons = new();
 
+    [FromForm(Name= "cpn")]
+    public int CurrentPageNumber { get; set; }
+
+    public sealed record PageNumberInfo(string PageLabel, int PageNumber, bool IsItCurrentPageSelected)
+    {
+        public static PageNumberInfo From(int number, int currentPage) =>
+            new(PageLabel: number.ToString(), PageNumber: number, IsItCurrentPageSelected: currentPage == number);
+    }
+
+    public List<PageNumberInfo> PageNumbersToDisplay { get; set; }
+
+    [FromForm(Name = "cps")]
+    public int CurrentPageSize { get; set; }
+
     public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config)
     {
         this._availabilityState = availabilityState;
         this.ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
     }
 
-    public async Task OnGet()
+    public async Task<IActionResult> OnGet()
     {
-        var response = await _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor(withParams: new(
-            PageNumber: 1,
-            PageSize: 10,
-            SortingColumn: "device",
-            SortingDirection: "asc"
-        ));
+        CurrentPageNumber = 1;
+        CurrentPageSize = 10;
 
-        DowntimePeriodsPerDevice = response.StopingPeriods.Select(MapToViewModel).ToArray();
+        await SetDowntimePeriodsToDisplay();
+
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostSpecificPageNumber(int number)
+    {
+        CurrentPageNumber = number;
+
+        await SetDowntimePeriodsToDisplay();
+
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostSpecificPageSize(int size)
+    {
+        CurrentPageSize = size;
+        CurrentPageNumber = 1;  // when changing page size, go back to first page
+
+        await SetDowntimePeriodsToDisplay();
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostSaveReasonsIndividuallyAsync()
@@ -74,6 +106,65 @@ public class IndexModel : PageModel
         }
 
         return RedirectToPage();
+    }
+
+    private async Task SetDowntimePeriodsToDisplay()
+    {
+        var response = await _availabilityState.GetPendingDowntimePeriodsToSetReasonsFor(withParams: new(
+            PageNumber: CurrentPageNumber,
+            PageSize: CurrentPageSize,
+            SortingColumn: "period_start",
+            SortingDirection: "desc"
+        ));
+
+        DowntimePeriodsPerDevice = response.StopingPeriods.Select(MapToViewModel).ToArray();
+        PageNumbersToDisplay = GetPageNumbersToDisplay(fromNumberOfPagesRetrieved: response.NumberOfPages, withCurrentPageNumberSelected: CurrentPageNumber).ToList();
+    }
+
+    private static IEnumerable<int> GetSequenceWhenPageCountIsLessThanMaxPagesThatCanBeDisplayed(int fromNumberOfPagesRetrieved) =>
+        Enumerable.Range(start: 1, count: fromNumberOfPagesRetrieved);
+
+    private static IEnumerable<int> GetSequenceForFirstLeftSegment(int maxNumberOfPageNumbersThatCanBeDisplayed) =>
+        Enumerable.Range(start: 1, count: maxNumberOfPageNumbersThatCanBeDisplayed);
+
+    private static IEnumerable<int> GetSequenceForLastSegmentAtTheRight(int fromNumberOfPagesRetrieved, int maxNumberOfPageNumbersThatCanBeDisplayed) =>
+        Enumerable.Range(start: fromNumberOfPagesRetrieved - maxNumberOfPageNumbersThatCanBeDisplayed + 1, count: maxNumberOfPageNumbersThatCanBeDisplayed);
+
+    private static IEnumerable<int> GetSequenceForMiddleSegment(int withCurrentPageNumberSelected, int maxNumberOfPageNumbersThatCanBeDisplayed) =>
+        Enumerable.Range(start: withCurrentPageNumberSelected - (maxNumberOfPageNumbersThatCanBeDisplayed / 2), count: maxNumberOfPageNumbersThatCanBeDisplayed);
+
+    private static IEnumerable<PageNumberInfo> GetPageNumbersToDisplay(int fromNumberOfPagesRetrieved, int withCurrentPageNumberSelected)
+    {
+        const int maxNumberOfPageNumbersThatCanBeDisplayed = 10;
+        const int minPagesLeftAtTheRightSide = 2;
+
+        var areThereLessPagesThanMaxPageCountThatCanBeDisplayed = fromNumberOfPagesRetrieved <= maxNumberOfPageNumbersThatCanBeDisplayed;
+        var isCurrentPageAtTheFirstLeftSegment = areThereLessPagesThanMaxPageCountThatCanBeDisplayed == false && withCurrentPageNumberSelected <= maxNumberOfPageNumbersThatCanBeDisplayed - minPagesLeftAtTheRightSide;
+        var isCurrentPageAtMiddleSegment = isCurrentPageAtTheFirstLeftSegment == false && withCurrentPageNumberSelected <= fromNumberOfPagesRetrieved - (maxNumberOfPageNumbersThatCanBeDisplayed / 2);
+        var isCurrentPageAtLastSegmentToTheRight = isCurrentPageAtMiddleSegment == false && withCurrentPageNumberSelected > fromNumberOfPagesRetrieved - (maxNumberOfPageNumbersThatCanBeDisplayed / 2);
+
+        Func<int, PageNumberInfo> _map = pageNumber => PageNumberInfo.From(number: pageNumber, currentPage: withCurrentPageNumberSelected);
+
+        if (areThereLessPagesThanMaxPageCountThatCanBeDisplayed)
+        {
+            foreach (var pageInfo in GetSequenceWhenPageCountIsLessThanMaxPagesThatCanBeDisplayed(fromNumberOfPagesRetrieved).Select(_map))
+                yield return pageInfo;
+        }
+        else
+        {
+            yield return new(PageLabel: "|<<", PageNumber: 1, IsItCurrentPageSelected: false);
+
+            if (isCurrentPageAtTheFirstLeftSegment)
+                foreach (var pageInfo in GetSequenceForFirstLeftSegment(maxNumberOfPageNumbersThatCanBeDisplayed).Select(_map)) yield return pageInfo;
+            
+            if(isCurrentPageAtMiddleSegment)
+                foreach (var pageInfo in GetSequenceForMiddleSegment(withCurrentPageNumberSelected, maxNumberOfPageNumbersThatCanBeDisplayed).Select(_map)) yield return pageInfo;
+
+            if(isCurrentPageAtLastSegmentToTheRight)
+                foreach (var pageInfo in GetSequenceForLastSegmentAtTheRight(fromNumberOfPagesRetrieved, maxNumberOfPageNumbersThatCanBeDisplayed).Select(_map)) yield return pageInfo;
+            
+            yield return new(PageLabel: ">>|", PageNumber: fromNumberOfPagesRetrieved, IsItCurrentPageSelected: false);
+        }
     }
 
     private Maybe<string> TryGetReason(string setInDropDownWithName)

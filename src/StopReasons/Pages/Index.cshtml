@@ -22,7 +22,6 @@
             </div>
         </div>
 
-        <input name="numberOfDowntimePeriods" type="hidden" value=@Model.DowntimePeriodsPerDevice.Count() />
         <table class="table table-striped" data-toggle="table" data-search="true" data-search-highlight="true">
             <thead>
                 <tr>
@@ -54,8 +53,35 @@
             }
             </tbody>
         </table>
+        
+        <br />
+        Page Number:
+        <table>
+            <tr>
+                @foreach (var pageInfo in Model.PageNumbersToDisplay)
+                {
+                <td><input type="submit" class="btn btn-sm @(pageInfo.IsItCurrentPageSelected ? "btn-primary" : "btn-outline-primary")" value=@pageInfo.PageLabel asp-page-handler="SpecificPageNumber" asp-route-number=@pageInfo.PageNumber /></td>
+                }
+            </tr>
+        </table>
+
+        <br />
+        Page Size: 
+        <table>
+            <tr>
+                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="1" asp-page-handler="SpecificPageSize" asp-route-size="1" /></td>
+                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="10"  asp-page-handler="SpecificPageSize" asp-route-size="10" /></td>
+                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="50"  asp-page-handler="SpecificPageSize" asp-route-size="50" /></td>
+                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="100" asp-page-handler="SpecificPageSize" asp-route-size="100" /></td>
+                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="200" asp-page-handler="SpecificPageSize" asp-route-size="200" /></td>
+            </tr>
+        </table>
+        
         <br />
         <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones en forma individual" asp-page-handler="SaveReasonsIndividually" />
+
+        <input type="hidden" name="cpn" value=@Model.CurrentPageNumber />
+        <input type="hidden" name="cps" value=@Model.CurrentPageSize />
     </form>
 }
 else
