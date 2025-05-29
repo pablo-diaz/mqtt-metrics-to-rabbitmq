@@ -25,7 +25,7 @@ public class AvailabilityStateManager
         await _persistence.StoreReason(id: forDowntimePeriodId, reason: reason);
     }
 
-    public sealed record LoadingParams(int PageNumber, int PageSize, string SortingColumn, string SortingDirection);
+    public sealed record LoadingParams(int PageNumber, int PageSize, string SortingColumn, string SortingDirection, List<string> maybeFilterByTheseDeviceIds);
 
     public sealed record PendingDowntimePeriodToSetReasonsFor(string DeviceId, long DowntimePeriodId, DateTime InitiallyStoppedAt, DateTime LastStopReportedAt);
     public sealed record LoadingResponse(List<PendingDowntimePeriodToSetReasonsFor> StopingPeriods, int TotalNumberOfPeriods, int NumberOfPages);
@@ -33,7 +33,10 @@ public class AvailabilityStateManager
     public async Task<LoadingResponse> GetPendingDowntimePeriodsToSetReasonsFor(LoadingParams withParams)
     {
         var pendingReasonsLoadedFromPersistence = await _persistence
-            .LoadPendingStopReasonsToSet(offsetInfo: MapLoadingOffset(from: withParams), sortingCriteria: MapLoadingOrder(from: withParams));
+            .LoadPendingStopReasonsToSet(
+                offsetInfo: MapLoadingOffset(from: withParams),
+                sortingCriteria: MapLoadingOrder(from: withParams),
+                maybeFilterByTheseDeviceIds: withParams.maybeFilterByTheseDeviceIds);
 
         return new(
             StopingPeriods: pendingReasonsLoadedFromPersistence

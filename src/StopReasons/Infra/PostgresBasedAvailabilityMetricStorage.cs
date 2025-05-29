@@ -100,15 +100,20 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
     }
     
     public async Task<IAvailabilityMetricStorage.LoadingResponse> LoadPendingStopReasonsToSet(
-        IAvailabilityMetricStorage.LoadingOffset offsetInfo, IAvailabilityMetricStorage.LoadingOrder sortingCriteria)
+        IAvailabilityMetricStorage.LoadingOffset offsetInfo, IAvailabilityMetricStorage.LoadingOrder sortingCriteria,
+        List<string> maybeFilterByTheseDeviceIds)
     {
+        var dynamicDeviceIdFilter = maybeFilterByTheseDeviceIds.Any()
+            ? $" AND device_id in ({JoinValuesForInStatement(maybeFilterByTheseDeviceIds)}) "
+            : "";
+
         var totalSqlText = @$"SELECT count(*)
                             FROM device_downtime_reason
-                            WHERE maybe_stopping_reason is null";
+                            WHERE maybe_stopping_reason is null {dynamicDeviceIdFilter}";
 
         var commandText = @$"SELECT id, device_id, initially_stopped_at, last_stopped_metric_traced_at
                             FROM device_downtime_reason
-                            WHERE maybe_stopping_reason is null
+                            WHERE maybe_stopping_reason is null {dynamicDeviceIdFilter}
                             ORDER BY {Map(from: sortingCriteria)}
                             LIMIT @pCount
                             OFFSET @pOffset";
@@ -117,6 +122,9 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
             RecordsLoaded: (await _connection.QueryAsync<DbDto>(commandText, param: new { pCount = offsetInfo.Count, pOffset = offsetInfo.Offset })).Select(r => r.Map()).ToList(),
             TotalRecordCount: await _connection.QueryFirstAsync<int>(sql: totalSqlText));
     }
+
+    private static string JoinValuesForInStatement(List<string> values) =>
+        string.Join(separator: ',', values: values.Select(value => $"'{value}'"));
 
     public async Task<List<IAvailabilityMetricStorage.StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(DateTimeOffset from, DateTimeOffset to)
     {

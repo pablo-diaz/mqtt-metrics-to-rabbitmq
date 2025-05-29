@@ -20,6 +20,7 @@ builder.Services.AddSingleton<IMessageReceiver, RabbitMqMessageReceiver>();
 builder.Services.AddSingleton<IntegrationService>();
 builder.Services.AddTransient<IAvailabilityMetricStorage, PostgresBasedAvailabilityMetricStorage>();
 builder.Services.AddScoped<AvailabilityStateManager>();
+builder.Services.AddSingleton<ServiceToFilterDevicesByLineOfBusiness>();
 
 builder.Services.AddHostedService<AvailabilityMetricsListener>();
 

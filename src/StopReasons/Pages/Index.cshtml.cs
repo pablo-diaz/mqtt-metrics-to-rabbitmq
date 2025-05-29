@@ -19,11 +19,14 @@ namespace StopReasons.Pages;
 public class IndexModel : PageModel
 {
     private readonly AvailabilityStateManager _availabilityState;
+    private readonly ServiceToFilterDevicesByLineOfBusiness _serviceToFilterDevicesByLine;
     private const string _downtimeReasonDropDownPrefix = "drdd_";
     private const string _downtimeReasonCheckBoxPrefix = "drcb_";
+    private const int _defaultPageSize = 10;
 
     public PendingDowntimePeriodToSetReasonsForViewModel[] DowntimePeriodsPerDevice;
     public readonly List<(string ReasonText, string ReasonCode)> ValidReasons = new();
+    public readonly List<string> LineOfBusinesses = new();
 
     [FromForm(Name= "cpn")]
     public int CurrentPageNumber { get; set; }
@@ -39,16 +42,22 @@ public class IndexModel : PageModel
     [FromForm(Name = "cps")]
     public int CurrentPageSize { get; set; }
 
-    public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config)
+    [FromForm(Name = "cls")]
+    public string CurrentLineSelected { get; set; } = "-";
+
+    public IndexModel(ILogger<IndexModel> logger, AvailabilityStateManager availabilityState, IOptions<DowntimeReasonsConfig> config,
+        ServiceToFilterDevicesByLineOfBusiness serviceToFilterDevicesByLine)
     {
         this._availabilityState = availabilityState;
+        this._serviceToFilterDevicesByLine = serviceToFilterDevicesByLine;
         this.ValidReasons = config.Value.AllowedReasons.Select(o => (ReasonText: o.Text, ReasonCode: o.Code)).ToList();
+        this.LineOfBusinesses = this._serviceToFilterDevicesByLine.ListAllLineOfBusiness();
     }
 
     public async Task<IActionResult> OnGet()
     {
         CurrentPageNumber = 1;
-        CurrentPageSize = 10;
+        CurrentPageSize = _defaultPageSize;
 
         await SetDowntimePeriodsToDisplay();
 
@@ -68,6 +77,17 @@ public class IndexModel : PageModel
     {
         CurrentPageSize = size;
         CurrentPageNumber = 1;  // when changing page size, go back to first page
+
+        await SetDowntimePeriodsToDisplay();
+
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostSpecificDevicesInLine(string linename)
+    {
+        CurrentPageSize = _defaultPageSize;
+        CurrentPageNumber = 1;
+        CurrentLineSelected = linename;
 
         await SetDowntimePeriodsToDisplay();
 
@@ -114,7 +134,8 @@ public class IndexModel : PageModel
             PageNumber: CurrentPageNumber,
             PageSize: CurrentPageSize,
             SortingColumn: "period_start",
-            SortingDirection: "desc"
+            SortingDirection: "desc",
+            maybeFilterByTheseDeviceIds: CurrentLineSelected == "-" ? [] : _serviceToFilterDevicesByLine.ListDeviceIds(boundToLineOfBusiness: CurrentLineSelected)
         ));
 
         DowntimePeriodsPerDevice = response.StopingPeriods.Select(MapToViewModel).ToArray();

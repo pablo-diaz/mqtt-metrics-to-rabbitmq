@@ -4,92 +4,111 @@
     ViewData["Title"] = "Razones de Paro";
 }
 
-@if (Model.DowntimePeriodsPerDevice.Any())
-{
-    <form method="post">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Establecer esta razón para todas las filas seleccionadas abajo</h5>
-                <select name="ddlReasonToSetMassively">
-                    <option value="">Por favor seleccione una razón para establecer en forma masiva</option>
-                    @foreach (var validReason in Model.ValidReasons)
-                    {
-                    <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
-                    }
-                </select>
-                &nbsp;&nbsp;
-                <input class="btn btn-warning btn-lg" type="submit" onclick="return confirm('Está seguro de querer establecerle esta misma razón a todos los períodos seleccionados abajo?')" value="Establecer esta razón en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
-            </div>
-        </div>
+<form method="post">
+    <table style="width: 100%">
+        <tr>
+            <td style="width: 100%">
+                Filtre eventos de dispositivos por Línea:
+                <table>
+                    <tr>
+                        <td><input type="submit" class="btn btn-sm @(Model.CurrentLineSelected == "-" ? "btn-primary" : "btn-outline-primary")" value="Todas las Líneas" asp-page-handler="SpecificDevicesInLine" asp-route-linename="-" /></td>
+                        @foreach (var lineName in Model.LineOfBusinesses)
+                        {
+                        <td><input type="submit" class="btn btn-sm @(Model.CurrentLineSelected == lineName ? "btn-primary" : "btn-outline-primary")" value=@lineName asp-page-handler="SpecificDevicesInLine" asp-route-linename=@lineName /></td>
+                        }
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    <br />
 
-        <table class="table table-striped" data-toggle="table" data-search="true" data-search-highlight="true">
-            <thead>
-                <tr>
-                    <th data-sortable="true">Dispositivo</th>
-                    <th data-sortable="true">Paro desde</th>
-                    <th data-sortable="true">Más reciente Paro</th>
-                    <th>Razón de Paro</th>
-                    <th style="width: 10px"/>
-                </tr>
-            </thead>
-            <tbody>
+    @if (Model.DowntimePeriodsPerDevice.Any())
+    {
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Establecer esta razón para todas las filas seleccionadas abajo</h5>
+            <select name="ddlReasonToSetMassively">
+                <option value="">Por favor seleccione una razón para establecer en forma masiva</option>
+                @foreach (var validReason in Model.ValidReasons)
+                {
+                <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
+                }
+            </select>
+            &nbsp;&nbsp;
+            <input class="btn btn-warning btn-lg" type="submit" onclick="return confirm('Está seguro de querer establecerle esta misma razón a todos los períodos seleccionados abajo?')" value="Establecer esta razón en forma masiva" asp-page-handler="SaveReasonsMassively" title="Establecer esta razón para todas las filas seleccionadas abajo" />
+        </div>
+    </div>
+
+    <table class="table table-striped" data-toggle="table" data-search="true" data-search-highlight="true">
+        <thead>
+            <tr>
+                <th data-sortable="true">Dispositivo</th>
+                <th data-sortable="true">Paro desde</th>
+                <th data-sortable="true">Más reciente Paro</th>
+                <th>Razón de Paro</th>
+                <th style="width: 10px"/>
+            </tr>
+        </thead>
+        <tbody>
             @foreach (var period in Model.DowntimePeriodsPerDevice)
             {
-                <tr>
-                    <td>@period.DeviceId</td>
-                    <td>@period.InitiallyStoppedAt</td>
-                    <td>@period.LastStopReportedAt</td>
-                    <td>
-                        <select name=@period.ReasonDropDownFieldName>
-                            <option value="">Por favor seleccione una razón</option>
-                            @foreach (var validReason in Model.ValidReasons)
-                            {
-                            <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
-                            }
-                        </select>
-                    </td>
-                        <td><input class="form-check-input" type="checkbox" name=@period.ReasonCheckBoxFieldName /></td>
-                </tr>
-            }
-            </tbody>
-        </table>
-
-        <br />
-        <table style="width: 100%">
             <tr>
-                <td style="width: 50%">
-                    Escoja la página que quiere ver:
-                    <table>
-                        <tr>
-                            @foreach (var pageInfo in Model.PageNumbersToDisplay)
-                            {
-                            <td><input type="submit" class="btn btn-sm @(pageInfo.IsItCurrentPageSelected ? "btn-primary" : "btn-outline-primary")" value=@pageInfo.PageLabel asp-page-handler="SpecificPageNumber" asp-route-number=@pageInfo.PageNumber /></td>
-                            }
-                        </tr>
-                    </table>
+                <td>@period.DeviceId</td>
+                <td>@period.InitiallyStoppedAt</td>
+                <td>@period.LastStopReportedAt</td>
+                <td>
+                    <select name=@period.ReasonDropDownFieldName>
+                        <option value="">Por favor seleccione una razón</option>
+                        @foreach (var validReason in Model.ValidReasons)
+                        {
+                            <option value=@validReason.ReasonCode>@validReason.ReasonCode - @validReason.ReasonText</option>
+                        }
+                    </select>
                 </td>
-                <td style="width: 50%" align="right">
-                    Escoja el tamaño de Página: 
-                    <table>
-                        <tr>
-                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 10 ? "btn-primary" : "btn-outline-primary")" value="10" asp-page-handler="SpecificPageSize" asp-route-size="10" /></td>
-                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 50 ? "btn-primary" : "btn-outline-primary")" value="50" asp-page-handler="SpecificPageSize" asp-route-size="50" /></td>
-                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 100 ? "btn-primary" : "btn-outline-primary")" value="100" asp-page-handler="SpecificPageSize" asp-route-size="100" /></td>
-                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 200 ? "btn-primary" : "btn-outline-primary")" value="200" asp-page-handler="SpecificPageSize" asp-route-size="200" /></td>
-                        </tr>
-                    </table>
-                </td>
+                <td><input class="form-check-input" type="checkbox" name=@period.ReasonCheckBoxFieldName /></td>
             </tr>
-        </table>
-        
-        <br />
-        <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones en forma individual" asp-page-handler="SaveReasonsIndividually" />
+            }
+        </tbody>
+    </table>
 
-        <input type="hidden" name="cpn" value=@Model.CurrentPageNumber />
-        <input type="hidden" name="cps" value=@Model.CurrentPageSize />
-    </form>
-}
-else
-{
-<div class="alert alert-success" role="alert">No hay razones pendientes a establecer para los Paros</div>
-}
+    <br />
+    <table style="width: 100%">
+        <tr>
+            <td style="width: 50%">
+                Escoja la página que quiere ver:
+                <table>
+                    <tr>
+                        @foreach (var pageInfo in Model.PageNumbersToDisplay)
+                        {
+                        <td><input type="submit" class="btn btn-sm @(pageInfo.IsItCurrentPageSelected ? "btn-primary" : "btn-outline-primary")" value=@pageInfo.PageLabel asp-page-handler="SpecificPageNumber" asp-route-number=@pageInfo.PageNumber /></td>
+                        }
+                    </tr>
+                </table>
+            </td>
+            <td style="width: 50%" align="right">
+                Escoja el tamaño de Página: 
+                <table>
+                    <tr>
+                        <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 10 ? "btn-primary" : "btn-outline-primary")" value="10" asp-page-handler="SpecificPageSize" asp-route-size="10" /></td>
+                        <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 50 ? "btn-primary" : "btn-outline-primary")" value="50" asp-page-handler="SpecificPageSize" asp-route-size="50" /></td>
+                        <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 100 ? "btn-primary" : "btn-outline-primary")" value="100" asp-page-handler="SpecificPageSize" asp-route-size="100" /></td>
+                        <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 200 ? "btn-primary" : "btn-outline-primary")" value="200" asp-page-handler="SpecificPageSize" asp-route-size="200" /></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+        
+    <br />
+    <input class="btn btn-primary btn-lg" type="submit" value="Almacenar estas razones en forma individual" asp-page-handler="SaveReasonsIndividually" />
+    }
+    else
+    {
+    <div class="alert alert-success" role="alert">No hay paros de dispositivos pendientes a establecerles sus motivo @(Model.CurrentLineSelected != "-" ? "(en la linea filtrada)" : "(en todas las lineas)")</div>
+    }
+
+    <input type="hidden" name="cpn" value=@Model.CurrentPageNumber />
+    <input type="hidden" name="cps" value=@Model.CurrentPageSize />
+    <input type="hidden" name="cls" value=@Model.CurrentLineSelected />
+</form>

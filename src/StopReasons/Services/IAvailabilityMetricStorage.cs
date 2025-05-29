@@ -17,7 +17,7 @@ public interface IAvailabilityMetricStorage: IDisposable
     public sealed record StoppingPeriodWithReasonSet(string DeviceId, DateTime InitiallyStoppedAt, DateTime LastStopReportedAt, string StoppingReason);
 
     Task<long> GetCurrentIdUsedForDowntimePeriods();
-    Task<LoadingResponse> LoadPendingStopReasonsToSet(LoadingOffset offsetInfo, LoadingOrder sortingCriteria);
+    Task<LoadingResponse> LoadPendingStopReasonsToSet(LoadingOffset offsetInfo, LoadingOrder sortingCriteria, List<string> maybeFilterByTheseDeviceIds);
     Task<Maybe<long>> GetDowntimePeriodIdOfMostRecentStoppedPeriod(string forDeviceId);
     Task Add(AvailabilityMetricInStorage metric);
     Task StoreReason(long id, string reason);
