@@ -53,27 +53,32 @@
             }
             </tbody>
         </table>
-        
-        <br />
-        Page Number:
-        <table>
-            <tr>
-                @foreach (var pageInfo in Model.PageNumbersToDisplay)
-                {
-                <td><input type="submit" class="btn btn-sm @(pageInfo.IsItCurrentPageSelected ? "btn-primary" : "btn-outline-primary")" value=@pageInfo.PageLabel asp-page-handler="SpecificPageNumber" asp-route-number=@pageInfo.PageNumber /></td>
-                }
-            </tr>
-        </table>
 
         <br />
-        Page Size: 
-        <table>
+        <table style="width: 100%">
             <tr>
-                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="1" asp-page-handler="SpecificPageSize" asp-route-size="1" /></td>
-                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="10"  asp-page-handler="SpecificPageSize" asp-route-size="10" /></td>
-                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="50"  asp-page-handler="SpecificPageSize" asp-route-size="50" /></td>
-                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="100" asp-page-handler="SpecificPageSize" asp-route-size="100" /></td>
-                <td><input type="submit" class="btn btn-outline-primary btn-sm" value="200" asp-page-handler="SpecificPageSize" asp-route-size="200" /></td>
+                <td style="width: 50%">
+                    Escoja la página que quiere ver:
+                    <table>
+                        <tr>
+                            @foreach (var pageInfo in Model.PageNumbersToDisplay)
+                            {
+                            <td><input type="submit" class="btn btn-sm @(pageInfo.IsItCurrentPageSelected ? "btn-primary" : "btn-outline-primary")" value=@pageInfo.PageLabel asp-page-handler="SpecificPageNumber" asp-route-number=@pageInfo.PageNumber /></td>
+                            }
+                        </tr>
+                    </table>
+                </td>
+                <td style="width: 50%" align="right">
+                    Escoja el tamaño de Página: 
+                    <table>
+                        <tr>
+                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 10 ? "btn-primary" : "btn-outline-primary")" value="10" asp-page-handler="SpecificPageSize" asp-route-size="10" /></td>
+                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 50 ? "btn-primary" : "btn-outline-primary")" value="50" asp-page-handler="SpecificPageSize" asp-route-size="50" /></td>
+                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 100 ? "btn-primary" : "btn-outline-primary")" value="100" asp-page-handler="SpecificPageSize" asp-route-size="100" /></td>
+                            <td><input type="submit" class="btn btn-sm @(Model.CurrentPageSize == 200 ? "btn-primary" : "btn-outline-primary")" value="200" asp-page-handler="SpecificPageSize" asp-route-size="200" /></td>
+                        </tr>
+                    </table>
+                </td>
             </tr>
         </table>
         
