@@ -18,7 +18,7 @@
     "AvailabilityStateManagerConfig": {
       "WorkingStatusLabel": "Produciendo",
       "StoppedStatusLabel": "Parado",
-	  "SinceWhenToLoadPreExistingReasonsFromPersistence": "3h"
+	  "FilePathOfDeviceInfo": "/var/device-info.csv"
     },
 
     "DowntimeReasonsConfig": {
@@ -35,8 +35,7 @@
         { "Text": "Producción 10", "Code": "010" },
         { "Text": "Producción 11", "Code": "011" },
         { "Text": "Producción 12", "Code": "012" }
-      ],
-	  "MaxNumberOfReasonsToDisplay": 50
+      ]
     },
 
     "PostgresConfig": {

@@ -9,7 +9,7 @@ services:
       - ./config/rabbitmq/enabled-plugins:/etc/rabbitmq/enabled_plugins:ro
       - ./config/rabbitmq/definitions.json:/etc/rabbitmq/conf.d/definitions.json:ro
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: rabbitmq-diagnostics -q check_running
       interval: 30s
       timeout: 10s
       retries: 5
@@ -29,7 +29,7 @@ services:
     networks:
       - backend_space
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8086/ping"]
+      test: influx ping
       interval: 1m30s
       timeout: 10s
       retries: 3
@@ -59,7 +59,7 @@ services:
       - ./config/docker/postgres/init-scripts:/docker-entrypoint-initdb.d
       - /etc/passwd:/etc/passwd:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-d", "stopreasons"]
+      test: pg_isready -d stopreasons -U dev
       interval: 10s
       timeout: 10s
       retries: 5
@@ -69,7 +69,7 @@ services:
   
   stopreasonsserver:
     container_name: stop_reasons_container
-    image: "pabloandresd/stopping-reasons-webapp:007"
+    image: "pabloandresd/stopping-reasons-webapp:008"
     env_file:
       - ./config/docker/StopReasons/docker-env-vars
     ports:
@@ -81,6 +81,7 @@ services:
         condition: service_healthy
     volumes:
       - ./config/docker/StopReasons/config.json:/publish/appsettings.json:ro
+      - ./docs/example-of-device-info-file.csv:/var/device-info.csv:ro
     networks:
       - backend_space
   
