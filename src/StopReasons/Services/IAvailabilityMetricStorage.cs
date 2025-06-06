@@ -22,6 +22,6 @@ public interface IAvailabilityMetricStorage: IDisposable
     Task Add(AvailabilityMetricInStorage metric);
     Task StoreReason(long id, string reason);
     Task UpdateLastStoppedMetricTracedAt(long id, DateTime at, bool isItStillStopped);
-    Task<List<StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(DateTimeOffset from, DateTimeOffset to);
+    Task<List<StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(DateTime from, DateTime to);
 
 }

@@ -3,15 +3,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-using Microsoft.AspNetCore.Mvc;
-
 using StopReasons.Services;
+
+using Microsoft.AspNetCore.Mvc;
 
 namespace StopReasons.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class ReportController: ControllerBase
+public class ReportController : ControllerBase
 {
     private readonly AvailabilityStateManager _availabilityState;
 
@@ -32,18 +32,35 @@ public class ReportController: ControllerBase
 
     private async Task<string> GetCsvRowsForDowntimePeriods(string fromGmtDate, string toGmtDate, TimeSpan timeFrequencyOfRegistriesInPeriod) =>
         string.Join(separator: "\n",
-            values: (await this._availabilityState.GetMostRecentDowntimeReasons(inPeriod: new (From: DateTimeOffset.Parse(fromGmtDate), To: DateTimeOffset.Parse(toGmtDate))))
-                .Select(p => {
-                    var csvLinesForPeriod = new List<string>();
-                    for(var date = p.InitiallyStoppedAt; date <= p.LastStopReportedAt; date = date.Add(timeFrequencyOfRegistriesInPeriod))
-                    {
-                        var adjustedDateForInfluxQueriesPurposes = $"{NormalizeDateToUTC(date):yyyy-MM-ddTHH:mm}:00.000000000Z";
-                        var adjustedReasonForCsvPurposes = p.StoppingReason.Replace(",", " ").Replace("\n", " ");
-                        csvLinesForPeriod.Add($"{adjustedDateForInfluxQueriesPurposes},{p.DeviceId},{adjustedReasonForCsvPurposes}");
-                    }
-                    return csvLinesForPeriod;
-                })
+            values: (await this._availabilityState.GetMostRecentDowntimeReasons(
+                        inPeriod: new(
+                            From: DateTimeOffset.Parse(fromGmtDate),
+                            To: DateTimeOffset.Parse(toGmtDate))))
+                    .SelectMany(p => GetAllDatesInPeriodWithGivenTimeFrequency(period: p, timeFrequencyOfRegistriesInPeriod))
+                    .Distinct()
         );
+
+    private static List<string> GetAllDatesInPeriodWithGivenTimeFrequency(
+            AvailabilityStateManager.StoppingPeriodWithReasonSet period, TimeSpan timeFrequencyOfRegistriesInPeriod) =>
+        GenerateSequenceForAllDatesInPeriod(
+            from: period.InitiallyStoppedAt, 
+            to: period.LastStopReportedAt, 
+            withTimeDelta: timeFrequencyOfRegistriesInPeriod)
+        .Select(date => ToCsvOutputLineFormat(deviceId: period.DeviceId, stoppingReason: period.StoppingReason, date))
+        .ToList();
+
+    private static string ToCsvOutputLineFormat(string deviceId, string stoppingReason, DateTime date)
+    {
+        var adjustedDateForInfluxQueriesPurposes = $"{NormalizeDateToUTC(date):yyyy-MM-ddTHH:mm}:00.000000000Z";
+        var adjustedReasonForCsvPurposes = stoppingReason.Replace(",", " ").Replace("\n", " ");
+        return $"{adjustedDateForInfluxQueriesPurposes},{deviceId},{adjustedReasonForCsvPurposes}";
+    }
+
+    private static IEnumerable<DateTime> GenerateSequenceForAllDatesInPeriod(DateTime from, DateTime to, TimeSpan withTimeDelta)
+    {
+        for (var date = from; date <= to; date = date.Add(withTimeDelta))
+            yield return date;
+    }
 
     private static DateTime NormalizeDateToUTC(DateTime date) => date.AddHours(5);
 

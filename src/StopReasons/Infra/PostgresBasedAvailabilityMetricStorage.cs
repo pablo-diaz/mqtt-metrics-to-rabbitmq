@@ -21,7 +21,7 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
                 InitiallyStoppedAt: this.initially_stopped_at, LastStoppedMetricTracedAt: this.last_stopped_metric_traced_at);
     }
 
-    private sealed record AnotherDbDto(string device_id, DateTime initially_stopped_at, DateTime last_stopped_metric_traced_at, string maybe_stopping_reason)
+    private sealed record MostRecentDowntimeReasonsDbDto(string device_id, DateTime initially_stopped_at, DateTime last_stopped_metric_traced_at, string maybe_stopping_reason)
     {
         public IAvailabilityMetricStorage.StoppingPeriodWithReasonSet Map() =>
             new (DeviceId: this.device_id, InitiallyStoppedAt: this.initially_stopped_at, LastStopReportedAt: this.last_stopped_metric_traced_at, StoppingReason: this.maybe_stopping_reason);
@@ -126,15 +126,16 @@ public class PostgresBasedAvailabilityMetricStorage: IAvailabilityMetricStorage
     private static string JoinValuesForInStatement(List<string> values) =>
         string.Join(separator: ',', values: values.Select(value => $"'{value}'"));
 
-    public async Task<List<IAvailabilityMetricStorage.StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(DateTimeOffset from, DateTimeOffset to)
+    public async Task<List<IAvailabilityMetricStorage.StoppingPeriodWithReasonSet>> GetMostRecentDowntimeReasons(DateTime from, DateTime to)
     {
         var commandText = @$"SELECT device_id, initially_stopped_at, last_stopped_metric_traced_at, maybe_stopping_reason
                             FROM device_downtime_reason
                             WHERE maybe_stopping_reason is not null
                                 AND initially_stopped_at <= @to
-                                AND last_stopped_metric_traced_at >= @from";
+                                AND last_stopped_metric_traced_at >= @from
+                            ORDER BY initially_stopped_at, device_id";
 
-        return (await _connection.QueryAsync<AnotherDbDto>(sql: commandText, param: new { from, to }))
+        return (await _connection.QueryAsync<MostRecentDowntimeReasonsDbDto>(sql: commandText, param: new { from, to }))
             .Select(r => r.Map())
             .ToList();
     }
